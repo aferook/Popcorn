@@ -1,4 +1,20 @@
-﻿# 2.8.0 - 13/09/2017 #
+﻿# 3.0.0 - 27/09/2017 #
+***
+Various improvements
+
+### Details ###
+* Fix bugs
+* Improve notification management
+* Improve Trakt Auth
+
+# 2.9.0 - 25/09/2017 #
+***
+Various improvements
+
+### Details ###
+* Improve available update information and fix bugs
+
+# 2.8.0 - 13/09/2017 #
 ***
 Add recommendations to movie collections
 

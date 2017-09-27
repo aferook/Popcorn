@@ -88,6 +88,15 @@ namespace Popcorn.Properties {
         }
         
         /// <summary>
+        ///   Recherche une chaîne localisée semblable à A new update is applying... %PERCENTAGE% done..
+        /// </summary>
+        public static string ApplyingUpdate {
+            get {
+                return ResourceManager.GetString("ApplyingUpdate", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Recherche une chaîne localisée semblable à Average.
         /// </summary>
         public static string AverageLabel {
@@ -241,15 +250,6 @@ namespace Popcorn.Properties {
         }
         
         /// <summary>
-        ///   Recherche une chaîne localisée semblable à Connect.
-        /// </summary>
-        public static string Connect {
-            get {
-                return ResourceManager.GetString("Connect", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   Recherche une chaîne localisée semblable à CONNECTING TO CHROMECAST.
         /// </summary>
         public static string ConnectingToChomecastLabel {
@@ -331,11 +331,29 @@ namespace Popcorn.Properties {
         }
         
         /// <summary>
+        ///   Recherche une chaîne localisée semblable à Dismiss.
+        /// </summary>
+        public static string Dismiss {
+            get {
+                return ResourceManager.GetString("Dismiss", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Recherche une chaîne localisée semblable à Downloading subtitles....
         /// </summary>
         public static string DownloadingSubtitlesLabel {
             get {
                 return ResourceManager.GetString("DownloadingSubtitlesLabel", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Recherche une chaîne localisée semblable à A new update is downloading... %PERCENTAGE% done..
+        /// </summary>
+        public static string DownloadingUpdate {
+            get {
+                return ResourceManager.GetString("DownloadingUpdate", resourceCulture);
             }
         }
         
@@ -475,6 +493,15 @@ namespace Popcorn.Properties {
         }
         
         /// <summary>
+        ///   Recherche une chaîne localisée semblable à Ignore.
+        /// </summary>
+        public static string Ignore {
+            get {
+                return ResourceManager.GetString("Ignore", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Recherche une chaîne localisée semblable à Language.
         /// </summary>
         public static string LanguageLabel {
@@ -540,9 +567,27 @@ namespace Popcorn.Properties {
         /// <summary>
         ///   Recherche une chaîne localisée semblable à Login.
         /// </summary>
+        public static string Login {
+            get {
+                return ResourceManager.GetString("Login", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Recherche une chaîne localisée semblable à Login.
+        /// </summary>
         public static string LoginLabel {
             get {
                 return ResourceManager.GetString("LoginLabel", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Recherche une chaîne localisée semblable à Logout.
+        /// </summary>
+        public static string Logout {
+            get {
+                return ResourceManager.GetString("Logout", resourceCulture);
             }
         }
         
@@ -790,6 +835,15 @@ namespace Popcorn.Properties {
         }
         
         /// <summary>
+        ///   Recherche une chaîne localisée semblable à Restart.
+        /// </summary>
+        public static string Restart {
+            get {
+                return ResourceManager.GetString("Restart", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Recherche une chaîne localisée semblable à Save.
         /// </summary>
         public static string SaveButton {
@@ -975,6 +1029,15 @@ namespace Popcorn.Properties {
         public static string UnknownLabel {
             get {
                 return ResourceManager.GetString("UnknownLabel", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Recherche une chaîne localisée semblable à A new update has been applied..
+        /// </summary>
+        public static string UpdateApplied {
+            get {
+                return ResourceManager.GetString("UpdateApplied", resourceCulture);
             }
         }
         

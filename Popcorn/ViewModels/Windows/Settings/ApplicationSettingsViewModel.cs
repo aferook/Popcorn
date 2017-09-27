@@ -1,12 +1,16 @@
 ﻿using System;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
+using Enterwell.Clients.Wpf.Notifications;
 using GalaSoft.MvvmLight;
 using GalaSoft.MvvmLight.CommandWpf;
+using GalaSoft.MvvmLight.Ioc;
 using GalaSoft.MvvmLight.Messaging;
 using GalaSoft.MvvmLight.Threading;
 using NLog;
@@ -17,8 +21,10 @@ using Popcorn.Messaging;
 using Popcorn.Models.Localization;
 using Popcorn.Models.Subtitles;
 using Popcorn.Services.Subtitles;
+using Popcorn.Services.Trakt;
 using Popcorn.Services.User;
 using Popcorn.Utils;
+using Squirrel;
 
 namespace Popcorn.ViewModels.Windows.Settings
 {
@@ -41,6 +47,11 @@ namespace Popcorn.ViewModels.Windows.Settings
         /// Subtitle service
         /// </summary>
         private readonly ISubtitlesService _subtitlesService;
+
+        /// <summary>
+        /// Trakt service
+        /// </summary>
+        private readonly ITraktService _traktService;
 
         /// <summary>
         /// The download limit
@@ -113,12 +124,65 @@ namespace Popcorn.ViewModels.Windows.Settings
         private ICommand _changeSubtitleColorCommand;
 
         /// <summary>
+        /// Command used to logout from Trakt
+        /// </summary>
+        private ICommand _logoutTraktCommand;
+
+        /// <summary>
+        /// If an update is available
+        /// </summary>
+        private bool _updateAvailable;
+
+        /// <summary>
+        /// If an update is downloading
+        /// </summary>
+        private bool _updateDownloading;
+
+        /// <summary>
+        /// If an update is applying
+        /// </summary>
+        private bool _updateApplying;
+
+        /// <summary>
+        /// Update download progress
+        /// </summary>
+        private int _updateDownloadProgress;
+
+        /// <summary>
+        /// Update apply progress
+        /// </summary>
+        private int _updateApplyProgress;
+
+        /// <summary>
+        /// If an update has been applied
+        /// </summary>
+        private bool _updateApplied;
+
+        /// <summary>
+        /// File path of the installed update
+        /// </summary>
+        private string _updateFilePath;
+
+        /// <summary>
+        /// Notification manager
+        /// </summary>
+        private readonly NotificationMessageManager _manager;
+
+        /// <summary>
+        /// True if Trakt is connected
+        /// </summary>
+        private bool _isTraktLoggedIn;
+
+        /// <summary>
         /// Initializes a new instance of the ApplicationSettingsViewModel class.
         /// </summary>
         /// <param name="userService">User service</param>
         /// <param name="subtitlesService">Subtitles service</param>
-        public ApplicationSettingsViewModel(IUserService userService, ISubtitlesService subtitlesService)
+        /// <param name="traktService">Trakt service</param>
+        public ApplicationSettingsViewModel(IUserService userService, ISubtitlesService subtitlesService, ITraktService traktService, NotificationMessageManager manager)
         {
+            _traktService = traktService;
+            _manager = manager;
             _userService = userService;
             _subtitlesService = subtitlesService;
             Version = Constants.AppVersion;
@@ -246,12 +310,93 @@ namespace Popcorn.ViewModels.Windows.Settings
         }
 
         /// <summary>
+        /// True if update is downloading
+        /// </summary>
+        public bool UpdateDownloading
+        {
+            get => _updateDownloading;
+            set
+            {
+                Set(() => UpdateDownloading, ref _updateDownloading, value);
+            }
+        }
+
+        /// <summary>
+        /// True if update is available
+        /// </summary>
+        public bool UpdateAvailable
+        {
+            get => _updateAvailable;
+            set
+            {
+                Set(() => UpdateAvailable, ref _updateAvailable, value);
+            }
+        }
+
+        /// <summary>
+        /// True if update is applying
+        /// </summary>
+        public bool UpdateApplying
+        {
+            get => _updateApplying;
+            set
+            {
+                Set(() => UpdateApplying, ref _updateApplying, value);
+            }
+        }
+
+        /// <summary>
+        /// True if update has been applied
+        /// </summary>
+        public bool UpdateApplied
+        {
+            get => _updateApplied;
+            set
+            {
+                Set(() => UpdateApplied, ref _updateApplied, value);
+            }
+        }
+
+        /// <summary>
+        /// The update download progress
+        /// </summary>
+        public int UpdateDownloadProgress
+        {
+            get => _updateDownloadProgress;
+            set
+            {
+                Set(() => UpdateDownloadProgress, ref _updateDownloadProgress, value);
+            }
+        }
+
+        /// <summary>
+        /// The update apply progress
+        /// </summary>
+        public int UpdateApplyProgress
+        {
+            get => _updateApplyProgress;
+            set
+            {
+                Set(() => UpdateApplyProgress, ref _updateApplyProgress, value);
+            }
+        }
+
+        /// <summary>
         /// The language used through the application
         /// </summary>
         public Language Language
         {
             get => _language;
             set { Set(() => Language, ref _language, value); }
+        }
+
+        /// <summary>
+        /// True if Trakt is connected
+        /// </summary>
+        public bool IsTraktLoggedIn
+        {
+            get => _isTraktLoggedIn;
+            set { Set(() => IsTraktLoggedIn, ref _isTraktLoggedIn, value); }
         }
 
         /// <summary>
@@ -263,11 +408,23 @@ namespace Popcorn.ViewModels.Windows.Settings
         /// Update size cache
         /// </summary>
         public RelayCommand UpdateCacheSizeCommand { get; private set; }
-
+        
+        /// <summary>
+        /// Change subtitle
+        /// </summary>
         public ICommand ChangeSubtitleColorCommand
         {
             get => _changeSubtitleColorCommand;
             set => Set(ref _changeSubtitleColorCommand, value);
+        }
+
+        /// <summary>
+        /// Change subtitle
+        /// </summary>
+        public ICommand LogoutTraktCommand
+        {
+            get => _logoutTraktCommand;
+            set => Set(ref _logoutTraktCommand, value);
         }
 
         /// <summary>
@@ -292,7 +449,7 @@ namespace Popcorn.ViewModels.Windows.Settings
         {
             try
             {
-                var user = await _userService.GetUser();
+                var user = await _userService.GetUser().ConfigureAwait(false);
                 SubtitleSizes = new ObservableCollection<SubtitleSize>
                 {
                     new SubtitleSize
@@ -334,9 +491,10 @@ namespace Popcorn.ViewModels.Windows.Settings
 #pragma warning disable CS4014
                 Task.Run(async () =>
                 {
+                    IsTraktLoggedIn = await _traktService.IsLoggedIn();
                     LoadingSubtitles = true;
                     AvailableSubtitlesLanguages = new ObservableRangeCollection<string>();
-                    var languages = (await _subtitlesService.GetSubLanguages()).Select(a => a.LanguageName)
+                    var languages = (await _subtitlesService.GetSubLanguages().ConfigureAwait(false)).Select(a => a.LanguageName)
                         .OrderBy(a => a)
                         .ToList();
                     DispatcherHelper.CheckBeginInvokeOnUI(() =>
@@ -350,6 +508,10 @@ namespace Popcorn.ViewModels.Windows.Settings
                             : LocalizationProviderHelper.GetLocalizedValue<string>("NoneLabel");
                         LoadingSubtitles = false;
                     });
+
+#if !DEBUG
+                await StartUpdateProcessAsync().ConfigureAwait(false);
+#endif
                 });
 #pragma warning restore CS4014
             }
@@ -370,6 +532,87 @@ namespace Popcorn.ViewModels.Windows.Settings
         }
 
         /// <summary>
+        /// Look for update then download and apply if any
+        /// </summary>
+        private async Task StartUpdateProcessAsync()
+        {
+            var watchStart = Stopwatch.StartNew();
+
+            Logger.Info(
+                "Looking for updates...");
+            try
+            {
+                using (var updateManager = await UpdateManager.GitHubUpdateManager(Constants.GithubRepository))
+                {
+                    var updateInfo = await updateManager.CheckForUpdate();
+                    if (updateInfo == null)
+                    {
+                        Logger.Error(
+                            "Problem while trying to check new updates.");
+                        return;
+                    }
+
+                    if (updateInfo.ReleasesToApply.Any())
+                    {
+                        Messenger.Default.Send(new UpdateAvailableMessage());
+                        UpdateAvailable = true;
+                        Logger.Info(
+                            $"A new update has been found!\n Currently installed version: {updateInfo.CurrentlyInstalledVersion?.Version?.Version.Major}.{updateInfo.CurrentlyInstalledVersion?.Version?.Version.Minor}.{updateInfo.CurrentlyInstalledVersion?.Version?.Version.Build} - New update: {updateInfo.FutureReleaseEntry?.Version?.Version.Major}.{updateInfo.FutureReleaseEntry?.Version?.Version.Minor}.{updateInfo.FutureReleaseEntry?.Version?.Version.Build}");
+
+                        UpdateDownloading = true;
+                        await updateManager.DownloadReleases(updateInfo.ReleasesToApply, progress =>
+                        {
+                            UpdateDownloadProgress = progress;
+                        });
+                        UpdateDownloading = false;
+                        UpdateApplying = true;
+                        _updateFilePath = await updateManager.ApplyReleases(updateInfo, progress =>
+                        {
+                            UpdateApplyProgress = progress;
+                        });
+                        UpdateApplying = false;
+                        UpdateApplied = true;
+                        Logger.Info(
+                            "A new update has been applied.");
+                        _manager.CreateMessage()
+                            .Accent("#1751C3")
+                            .Background("#333")
+                            .HasBadge("Info")
+                            .HasMessage(LocalizationProviderHelper.GetLocalizedValue<string>("UpdateApplied"))
+                            .Dismiss().WithButton(LocalizationProviderHelper.GetLocalizedValue<string>("Restart"),
+                                button =>
+                                {
+                                    Logger.Info(
+                                        "Restarting...");
+
+                                    Process.Start($@"{_updateFilePath}\Popcorn.exe", "restart");
+                                    Application.Current.Shutdown();
+                                })
+                            .Dismiss().WithButton(LocalizationProviderHelper.GetLocalizedValue<string>("LaterLabel"),
+                                button => { })
+                            .Queue();
+                    }
+                    else
+                    {
+                        UpdateAvailable = false;
+                        Logger.Info(
+                            "No update available.");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(
+                    $"Something went wrong when trying to update app. {ex.Message}");
+            }
+
+            watchStart.Stop();
+            var elapsedStartMs = watchStart.ElapsedMilliseconds;
+            Logger.Info(
+                $"Finished looking for updates in {elapsedStartMs}.");
+        }
+
+        /// <summary>
         /// Register commands
         /// </summary>
         private void RegisterCommands()
@@ -383,12 +626,20 @@ namespace Popcorn.ViewModels.Windows.Settings
 
             ShowTraktDialogCommand = new RelayCommand(async () =>
             {
-                await Messenger.Default.SendAsync(new ShowTraktDialogMessage());
+                var message = new ShowTraktDialogMessage();
+                await Messenger.Default.SendAsync(message);
+                IsTraktLoggedIn = message.IsLoggedIn ?? false;
             });
 
             ChangeSubtitleColorCommand = new RelayCommand<EventArgs<Color>>(args =>
             {
                 SubtitlesColor = args.Value;
+            });
+
+            LogoutTraktCommand = new RelayCommand(async () =>
+            {
+                await _traktService.Logout();
+                IsTraktLoggedIn = false;
             });
         }
 

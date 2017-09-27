@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Reflection;
 using System.Threading;
@@ -17,6 +18,7 @@ using Popcorn.Helpers;
 using Popcorn.Messaging;
 using Popcorn.Utils;
 using Popcorn.Utils.Exceptions;
+using Popcorn.ViewModels.Windows;
 using Popcorn.Windows;
 using Squirrel;
 using WPFLocalizeExtension.Engine;
@@ -42,6 +44,11 @@ namespace Popcorn
         /// Watcher
         /// </summary>
         private static Stopwatch WatchStart { get; }
+    
+        /// <summary>
+        /// If first run
+        /// </summary>
+        private static bool _firstRun;
 
         /// <summary>
         /// Initializes a new instance of the App class.
@@ -63,6 +70,20 @@ namespace Popcorn
             if (!Directory.Exists(Constants.Assets))
             {
                 Directory.CreateDirectory(Constants.Assets);
+            }
+
+            try
+            {
+                SquirrelAwareApp.HandleEvents(
+                    onFirstRun: () =>
+                    {
+                        // TODO: Must complete welcome.md page before activate this feature
+                        //_firstRun = true;
+                    });
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex);
             }
         }
      
@@ -161,6 +182,11 @@ namespace Popcorn
                 {
                     _splashScreenDispatcher.BeginInvokeShutdown(DispatcherPriority.Background);
                     mainWindow.Activate();
+                    var vm = mainWindow.DataContext as WindowViewModel;
+                    if (_firstRun && vm != null)
+                    {
+                        vm.OpenWelcomeCommand.Execute(null);
+                    }
                     WatchStart.Stop();
                     var elapsedStartMs = WatchStart.ElapsedMilliseconds;
                     Logger.Info(

@@ -429,7 +429,7 @@
   <data name="SubtitlesSizeLabel" xml:space="preserve">
     <value>Taille des sous-titres</value>
   </data>
-  <data name="Connect" xml:space="preserve">
+  <data name="Login" xml:space="preserve">
     <value>Se connecter</value>
   </data>
   <data name="SyncTraktLabel" xml:space="preserve">
@@ -446,5 +446,26 @@
   </data>
   <data name="DiscoverTitleTab" xml:space="preserve">
     <value>Découvrir</value>
+  </data>
+  <data name="ApplyingUpdate" xml:space="preserve">
+    <value>Une nouvelle mise à jour s'installe... %PERCENTAGE% appliqué.</value>
+  </data>
+  <data name="DownloadingUpdate" xml:space="preserve">
+    <value>Une nouvelle mise à jour est en téléchargement... %PERCENTAGE% téléchargé.</value>
+  </data>
+  <data name="Restart" xml:space="preserve">
+    <value>Redémarrer</value>
+  </data>
+  <data name="UpdateApplied" xml:space="preserve">
+    <value>Une nouvelle mise à jour a été installée.</value>
+  </data>
+  <data name="Ignore" xml:space="preserve">
+    <value>Ignorer</value>
+  </data>
+  <data name="Logout" xml:space="preserve">
+    <value>Se déconnecter</value>
+  </data>
+  <data name="Dismiss" xml:space="preserve">
+    <value>Ok</value>
   </data>
 </root>

@@ -14,11 +14,12 @@ using Popcorn.Utils;
 using Popcorn.ViewModels.Windows.Settings;
 using GalaSoft.MvvmLight.Ioc;
 using Popcorn.Models.Bandwidth;
+using Popcorn.Services.Cache;
 using Popcorn.Services.Download;
 
 namespace Popcorn.ViewModels.Pages.Home.Show.Download
 {
-    public class DownloadShowViewModel : ViewModelBase, IDisposable
+    public class DownloadShowViewModel : ViewModelBase
     {
         /// <summary>
         /// Logger of the class
@@ -66,23 +67,25 @@ namespace Popcorn.ViewModels.Pages.Home.Show.Download
         private int _nbPeers;
 
         /// <summary>
-        /// Disposed
-        /// </summary>
-        private bool _disposed;
-
-        /// <summary>
         /// Token to cancel the download
         /// </summary>
         private CancellationTokenSource CancellationDownloadingEpisode { get; set; }
+
+        /// <summary>
+        /// The cache service
+        /// </summary>
+        private readonly ICacheService _cacheService;
 
         /// <summary>
         /// Constructor
         /// </summary>
         /// <param name="downloadService">The download service</param>
         /// <param name="subtitlesService">The subtitles service</param>
+        /// <param name="cacheService">The cache service</param>
         public DownloadShowViewModel(IDownloadService<EpisodeShowJson> downloadService,
-            ISubtitlesService subtitlesService)
+            ISubtitlesService subtitlesService, ICacheService cacheService)
         {
+            _cacheService = cacheService;
             _downloadService = downloadService;
             _subtitlesService = subtitlesService;
             CancellationDownloadingEpisode = new CancellationTokenSource();
@@ -206,7 +209,7 @@ namespace Popcorn.ViewModels.Pages.Home.Show.Download
                             message.Episode.SelectedSubtitle.Sub.LanguageName !=
                             LocalizationProviderHelper.GetLocalizedValue<string>("NoneLabel"))
                         {
-                            var path = Path.Combine(Constants.Subtitles + message.Episode.ImdbId);
+                            var path = Path.Combine(_cacheService.Subtitles + message.Episode.ImdbId);
                             Directory.CreateDirectory(path);
                             var subtitlePath =
                                 await _subtitlesService.DownloadSubtitleToPath(path,
@@ -275,32 +278,6 @@ namespace Popcorn.ViewModels.Pages.Home.Show.Download
         private void ReportEpisodeDownloadProgress(double value)
         {
             EpisodeDownloadProgress = value;
-        }
-
-        /// <summary>
-        /// Dispose
-        /// </summary>
-        public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-
-        /// <summary>
-        /// Dispose
-        /// </summary>
-        /// <param name="disposing"></param>
-        protected virtual void Dispose(bool disposing)
-        {
-            if (_disposed)
-                return;
-
-            if (disposing)
-            {
-                CancellationDownloadingEpisode?.Dispose();
-            }
-
-            _disposed = true;
         }
     }
 }

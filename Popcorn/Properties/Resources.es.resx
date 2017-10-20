@@ -468,4 +468,19 @@
   <data name="Dismiss" xml:space="preserve">
     <value>Despedir</value>
   </data>
+  <data name="UpdatedTitleTab" xml:space="preserve">
+    <value>Actualizado</value>
+  </data>
+  <data name="ChangeLocation" xml:space="preserve">
+    <value>Cambiar locación</value>
+  </data>
+  <data name="DroppedFileIssue" xml:space="preserve">
+    <value>Se ha producido un problema al procesar el archivo eliminado.</value>
+  </data>
+  <data name="MagnetLinkAssociationLabel" xml:space="preserve">
+    <value>Asociar con enlaces magnéticos</value>
+  </data>
+  <data name="TorrentFileAssociationLabel" xml:space="preserve">
+    <value>Asociado con archivos torrent</value>
+  </data>
 </root>

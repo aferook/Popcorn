@@ -6,6 +6,7 @@ using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Input;
 using GalaSoft.MvvmLight;
 using GalaSoft.MvvmLight.CommandWpf;
 using GalaSoft.MvvmLight.Ioc;
@@ -15,13 +16,17 @@ using NLog;
 using NuGet;
 using Popcorn.Helpers;
 using Popcorn.Messaging;
+using Popcorn.Models.Cast;
 using Popcorn.Models.Movie;
 using Popcorn.Services.Movies.Movie;
 using Popcorn.Services.Movies.Trailer;
 using Popcorn.Services.Subtitles;
 using Popcorn.ViewModels.Pages.Home.Movie.Download;
 using Popcorn.Models.Torrent.Movie;
+using Popcorn.Services.Cache;
 using Popcorn.Services.Download;
+using Popcorn.Services.User;
+using Popcorn.ViewModels.Pages.Home.Movie.Tabs;
 using Popcorn.ViewModels.Windows.Settings;
 using Subtitle = Popcorn.Models.Subtitles.Subtitle;
 
@@ -30,7 +35,7 @@ namespace Popcorn.ViewModels.Pages.Home.Movie.Details
     /// <summary>
     /// Manage the movie
     /// </summary>
-    public class MovieDetailsViewModel : ViewModelBase, IDisposable
+    public class MovieDetailsViewModel : ViewModelBase
     {
         /// <summary>
         /// Logger of the class
@@ -78,6 +83,16 @@ namespace Popcorn.ViewModels.Pages.Home.Movie.Details
         private bool _anySimilar;
 
         /// <summary>
+        /// Command used to set a movie as favorite
+        /// </summary>
+        public ICommand SetFavoriteMovieCommand { get; private set; }
+
+        /// <summary>
+        /// Command used to set a movie as watched
+        /// </summary>
+        public ICommand SetWatchedMovieCommand { get; private set; }
+
+        /// <summary>
         /// The movie to manage
         /// </summary>
         private MovieJson _movie = new MovieJson();
@@ -93,6 +108,11 @@ namespace Popcorn.ViewModels.Pages.Home.Movie.Details
         private readonly IMovieTrailerService _movieTrailerService;
 
         /// <summary>
+        /// The user service
+        /// </summary>
+        private readonly IUserService _userService;
+
+        /// <summary>
         /// The service used to interact with subtitles
         /// </summary>
         private ISubtitlesService SubtitlesService { get; }
@@ -106,11 +126,6 @@ namespace Popcorn.ViewModels.Pages.Home.Movie.Details
         /// Torrent health, from 0 to 10
         /// </summary>
         private double _torrentHealth;
-
-        /// <summary>
-        /// Disposed
-        /// </summary>
-        private bool _disposed;
 
         /// <summary>
         /// The selected torrent
@@ -133,17 +148,20 @@ namespace Popcorn.ViewModels.Pages.Home.Movie.Details
         /// <param name="movieService">Service used to interact with movies</param>
         /// <param name="movieTrailerService">The movie trailer service</param>
         /// <param name="subtitlesService">The subtitles service</param>
+        /// <param name="cacheService">The cache service</param>
+        /// <param name="userService">The user service</param>
         public MovieDetailsViewModel(IMovieService movieService, IMovieTrailerService movieTrailerService,
-            ISubtitlesService subtitlesService)
+            ISubtitlesService subtitlesService, ICacheService cacheService, IUserService userService)
         {
             _movieTrailerService = movieTrailerService;
+            _userService = userService;
             _movieService = movieService;
             Movie = new MovieJson();
             SimilarMovies = new ObservableCollection<MovieLightJson>();
             SubtitlesService = subtitlesService;
             CancellationLoadingToken = new CancellationTokenSource();
             CancellationLoadingTrailerToken = new CancellationTokenSource();
-            DownloadMovie = new DownloadMovieViewModel(subtitlesService, new DownloadMovieService<MovieJson>());
+            DownloadMovie = new DownloadMovieViewModel(subtitlesService, new DownloadMovieService<MovieJson>(cacheService), cacheService);
             RegisterMessages();
             RegisterCommands();
         }
@@ -259,22 +277,32 @@ namespace Popcorn.ViewModels.Pages.Home.Movie.Details
         /// <summary>
         /// Command used to load the movie
         /// </summary>
-        public RelayCommand<IMovie> LoadMovieCommand { get; private set; }
+        public ICommand LoadMovieCommand { get; private set; }
 
         /// <summary>
         /// Command used to stop loading the trailer
         /// </summary>
-        public RelayCommand StopLoadingTrailerCommand { get; private set; }
+        public ICommand StopLoadingTrailerCommand { get; private set; }
 
         /// <summary>
         /// Command used to play the movie
         /// </summary>
-        public RelayCommand PlayMovieCommand { get; private set; }
+        public ICommand PlayMovieCommand { get; private set; }
+
+        /// <summary>
+        /// Command used to browse Imdb
+        /// </summary>
+        public ICommand GoToImdbCommand { get; private set; }
 
         /// <summary>
         /// Command used to play the trailer
         /// </summary>
-        public RelayCommand PlayTrailerCommand { get; private set; }
+        public ICommand PlayTrailerCommand { get; private set; }
+
+        /// <summary>
+        /// Command used to search cast
+        /// </summary>
+        public ICommand SearchCastCommand { get; private set; }
 
         /// <summary>
         /// Cleanup resources
@@ -408,7 +436,13 @@ namespace Popcorn.ViewModels.Pages.Home.Movie.Details
                 message =>
                 {
                     if (!string.IsNullOrEmpty(Movie?.ImdbCode))
+                    {
                         _movieService.TranslateMovie(Movie);
+                        foreach (var similar in SimilarMovies)
+                        {
+                            _movieService.TranslateMovie(similar);
+                        }
+                    }
                 });
 
             Messenger.Default.Register<PropertyChangedMessage<bool>>(this, e =>
@@ -423,7 +457,12 @@ namespace Popcorn.ViewModels.Pages.Home.Movie.Details
         /// </summary>
         private void RegisterCommands()
         {
-            LoadMovieCommand = new RelayCommand<IMovie>(async movie => await LoadMovie(movie, CancellationLoadingToken.Token).ConfigureAwait(false));
+            LoadMovieCommand = new RelayCommand<IMovie>(async movie =>
+                await LoadMovie(movie, CancellationLoadingToken.Token).ConfigureAwait(false));
+            GoToImdbCommand = new RelayCommand<string>(e =>
+            {
+                Process.Start($"http://www.imdb.com/title/{e}");
+            });
 
             PlayMovieCommand = new RelayCommand(() =>
             {
@@ -437,12 +476,30 @@ namespace Popcorn.ViewModels.Pages.Home.Movie.Details
                 {
                     IsPlayingTrailer = true;
                     IsTrailerLoading = true;
-                    await _movieTrailerService.LoadTrailerAsync(Movie, CancellationLoadingTrailerToken.Token).ConfigureAwait(false);
+                    await _movieTrailerService.LoadTrailerAsync(Movie, CancellationLoadingTrailerToken.Token)
+                        .ConfigureAwait(false);
                     IsTrailerLoading = false;
                 }).ConfigureAwait(false);
             });
 
             StopLoadingTrailerCommand = new RelayCommand(StopLoadingTrailer);
+            SearchCastCommand = new RelayCommand<CastJson>(cast =>
+            {
+                Messenger.Default.Send(new SearchCastMessage(cast));
+            });
+
+            SetFavoriteMovieCommand =
+                new RelayCommand<MovieJson>(movie =>
+                {
+                    _userService.SetMovie(movie);
+                    Messenger.Default.Send(new ChangeFavoriteMovieMessage());
+                });
+
+            SetWatchedMovieCommand = new RelayCommand<MovieJson>(movie =>
+            {
+                _userService.SetMovie(movie);
+                Messenger.Default.Send(new ChangeSeenMovieMessage());
+            });
         }
 
         /// <summary>
@@ -461,12 +518,13 @@ namespace Popcorn.ViewModels.Pages.Home.Movie.Details
                 SimilarMovies.Clear();
                 await Task.Run(async () =>
                 {
+                    var applicationSettings = SimpleIoc.Default.GetInstance<ApplicationSettingsViewModel>();
                     Movie = await _movieService.GetMovieAsync(movie.ImdbCode, ct).ConfigureAwait(false);
                     _movieService.TranslateMovie(Movie);
+                    _userService.SyncMovieHistory(new List<IMovie> { Movie });
                     IsMovieLoading = false;
-                    Movie.FullHdAvailable = Movie.Torrents.Any(torrent => torrent.Quality == "1080p");
-                    var applicationSettings = SimpleIoc.Default.GetInstance<ApplicationSettingsViewModel>();
-                    Movie.WatchInFullHdQuality = Movie.FullHdAvailable && applicationSettings.DefaultHdQuality;
+                    Movie.FullHdAvailable = Movie.Torrents.Count != 1;
+                    Movie.WatchInFullHdQuality = (Movie.FullHdAvailable && Movie.Torrents.Count == 1) || (Movie.FullHdAvailable && applicationSettings.DefaultHdQuality);
                     ComputeTorrentHealth();
                     var tasks = new Func<Task>[]
                     {
@@ -487,7 +545,7 @@ namespace Popcorn.ViewModels.Pages.Home.Movie.Details
                         }
                     };
 
-                    await Task.WhenAll(tasks.Select(task => task()).ToArray()).ConfigureAwait(false);    
+                    await Task.WhenAll(tasks.Select(task => task()).ToArray()).ConfigureAwait(false);
                 }).ConfigureAwait(false);
             }
             catch (Exception ex)
@@ -562,13 +620,16 @@ namespace Popcorn.ViewModels.Pages.Home.Movie.Details
         /// </summary>
         private void StopLoadingMovie()
         {
-            Logger.Info(
-                $"Stop loading movie: {Movie.Title}.");
+            if (IsMovieLoading)
+            {
+                Logger.Info(
+                    $"Stop loading movie: {Movie.Title}.");
 
-            IsMovieLoading = false;
-            CancellationLoadingToken.Cancel();
-            CancellationLoadingToken.Dispose();
-            CancellationLoadingToken = new CancellationTokenSource();
+                IsMovieLoading = false;
+                CancellationLoadingToken.Cancel();
+                CancellationLoadingToken.Dispose();
+                CancellationLoadingToken = new CancellationTokenSource();
+            }
         }
 
         /// <summary>
@@ -576,14 +637,17 @@ namespace Popcorn.ViewModels.Pages.Home.Movie.Details
         /// </summary>
         private void StopLoadingTrailer()
         {
-            Logger.Info(
-                $"Stop loading movie's trailer: {Movie.Title}.");
+            if (IsTrailerLoading)
+            {
+                Logger.Info(
+                    $"Stop loading movie's trailer: {Movie.Title}.");
 
-            IsTrailerLoading = false;
-            CancellationLoadingTrailerToken.Cancel();
-            CancellationLoadingTrailerToken.Dispose();
-            CancellationLoadingTrailerToken = new CancellationTokenSource();
-            StopPlayingTrailer();
+                IsTrailerLoading = false;
+                CancellationLoadingTrailerToken.Cancel();
+                CancellationLoadingTrailerToken.Dispose();
+                CancellationLoadingTrailerToken = new CancellationTokenSource();
+                StopPlayingTrailer();
+            }
         }
 
         /// <summary>
@@ -591,10 +655,13 @@ namespace Popcorn.ViewModels.Pages.Home.Movie.Details
         /// </summary>
         private void StopPlayingTrailer()
         {
-            Logger.Info(
-                $"Stop playing movie's trailer: {Movie.Title}.");
+            if (IsPlayingTrailer)
+            {
+                Logger.Info(
+                    $"Stop playing movie's trailer: {Movie.Title}.");
 
-            IsPlayingTrailer = false;
+                IsPlayingTrailer = false;
+            }
         }
 
         /// <summary>
@@ -602,38 +669,14 @@ namespace Popcorn.ViewModels.Pages.Home.Movie.Details
         /// </summary>
         private void StopPlayingMovie()
         {
-            Logger.Info(
-                $"Stop playing movie: {Movie.Title}.");
-
-            IsDownloadingMovie = false;
-            DownloadMovie.StopDownloadingMovie();
-        }
-
-        /// <summary>
-        /// Dispose
-        /// </summary>
-        public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-
-        /// <summary>
-        /// Dispose
-        /// </summary>
-        /// <param name="disposing"></param>
-        protected virtual void Dispose(bool disposing)
-        {
-            if (_disposed)
-                return;
-
-            if (disposing)
+            if (IsDownloadingMovie)
             {
-                CancellationLoadingToken?.Dispose();
-                CancellationLoadingTrailerToken?.Dispose();
-            }
+                Logger.Info(
+                    $"Stop playing movie: {Movie.Title}.");
 
-            _disposed = true;
+                IsDownloadingMovie = false;
+                DownloadMovie.StopDownloadingMovie();
+            }
         }
     }
 }

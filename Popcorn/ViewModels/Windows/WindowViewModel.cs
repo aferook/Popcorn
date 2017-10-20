@@ -7,6 +7,7 @@ using System.Net.Sockets;
 using System.Reflection;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Input;
 using System.Windows.Navigation;
 using Akavache;
 using CefSharp;
@@ -28,6 +29,8 @@ using Popcorn.Extensions;
 using Popcorn.Helpers;
 using Popcorn.Messaging;
 using Popcorn.Services.Application;
+using Popcorn.Services.Cache;
+using Popcorn.Services.Hub;
 using Popcorn.Services.Server;
 using Popcorn.Services.User;
 using Popcorn.Utils;
@@ -37,27 +40,22 @@ using Popcorn.ViewModels.Pages.Home;
 using Popcorn.ViewModels.Pages.Home.Movie;
 using Popcorn.ViewModels.Pages.Home.Show;
 using Popcorn.ViewModels.Pages.Player;
-using Squirrel;
 using Popcorn.ViewModels.Windows.Settings;
 using Popcorn.Services.Subtitles;
 using Popcorn.Services.Trakt;
+using Popcorn.Vlc.Wpf;
 
 namespace Popcorn.ViewModels.Windows
 {
     /// <summary>
     /// Window applcation's viewmodel
     /// </summary>
-    public class WindowViewModel : ViewModelBase, IDisposable
+    public class WindowViewModel : ViewModelBase
     {
         /// <summary>
         /// Logger of the class
         /// </summary>
         private static Logger Logger { get; } = LogManager.GetCurrentClassLogger();
-
-        /// <summary>
-        /// Disposed
-        /// </summary>
-        private bool _disposed;
 
         /// <summary>
         /// Holds the async message relative to <see cref="CustomSubtitleMessage"/>
@@ -95,6 +93,11 @@ namespace Popcorn.ViewModels.Windows
         private bool _isMovieFlyoutOpen;
 
         /// <summary>
+        /// Specify if cast flyout is open
+        /// </summary>
+        private bool _isCastFlyoutOpen;
+
+        /// <summary>
         /// Specify if show flyout is open
         /// </summary>
         private bool _isShowFlyoutOpen;
@@ -130,6 +133,11 @@ namespace Popcorn.ViewModels.Windows
         private readonly ITraktService _traktService;
 
         /// <summary>
+        /// The popcorn hub service
+        /// </summary>
+        private readonly IPopcornHubService _popcornHubService;
+
+        /// <summary>
         /// <see cref="MediaPlayer"/>
         /// </summary>
         private MediaPlayerViewModel _mediaPlayer;
@@ -150,16 +158,31 @@ namespace Popcorn.ViewModels.Windows
         private readonly NotificationMessageManager _manager;
 
         /// <summary>
+        /// If initialized
+        /// </summary>
+        private bool _initialized;
+
+        /// <summary>
+        /// The cache service
+        /// </summary>
+        private readonly ICacheService _cacheService;
+
+        /// <summary>
         /// Initializes a new instance of the WindowViewModel class.
         /// </summary>
         /// <param name="applicationService">Instance of Application state</param>
         /// <param name="userService">Instance of movie history service</param>
         /// <param name="subtitlesService">Instance of subtitles service</param>
         /// <param name="traktService">Instance of Trakt service</param>
+        /// <param name="popcornHubService">Instance of Popcorn Hub service</param>
+        /// <param name="cacheService">Instance of cache service</param>
         /// <param name="manager">The notification manager</param>
         public WindowViewModel(IApplicationService applicationService, IUserService userService,
-            ISubtitlesService subtitlesService, ITraktService traktService, NotificationMessageManager manager)
+            ISubtitlesService subtitlesService, ITraktService traktService, IPopcornHubService popcornHubService,
+            ICacheService cacheService, NotificationMessageManager manager)
         {
+            _cacheService = cacheService;
+            _popcornHubService = popcornHubService;
             _traktService = traktService;
             _manager = manager;
             _subtitlesService = subtitlesService;
@@ -169,7 +192,6 @@ namespace Popcorn.ViewModels.Windows
             RegisterMessages();
             RegisterCommands();
             AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
-            ClearFolders();
         }
 
         /// <summary>
@@ -209,6 +231,15 @@ namespace Popcorn.ViewModels.Windows
         }
 
         /// <summary>
+        /// Specify if cast flyout is open
+        /// </summary>
+        public bool IsCastFlyoutOpen
+        {
+            get => _isCastFlyoutOpen;
+            set { Set(() => IsCastFlyoutOpen, ref _isCastFlyoutOpen, value); }
+        }
+
+        /// <summary>
         /// Specify if show flyout is open
         /// </summary>
         public bool IsShowFlyoutOpen
@@ -238,54 +269,54 @@ namespace Popcorn.ViewModels.Windows
         /// <summary>
         /// Command used to close movie page
         /// </summary>
-        public RelayCommand CloseMoviePageCommand { get; private set; }
+        public ICommand CloseMoviePageCommand { get; private set; }
 
         /// <summary>
         /// Command used to close show page
         /// </summary>
-        public RelayCommand CloseShowPageCommand { get; private set; }
+        public ICommand CloseShowPageCommand { get; private set; }
 
         /// <summary>
         /// Command used to close the application
         /// </summary>
-        public RelayCommand MainWindowClosingCommand { get; private set; }
+        public ICommand MainWindowClosingCommand { get; private set; }
 
         /// <summary>
         /// Command used to open application settings
         /// </summary>
-        public RelayCommand OpenSettingsCommand { get; private set; }
+        public ICommand OpenSettingsCommand { get; private set; }
 
         /// <summary>
         /// Command used to open about dialog
         /// </summary>
-        public RelayCommand OpenAboutCommand { get; private set; }
+        public ICommand OpenAboutCommand { get; private set; }
 
         /// <summary>
         /// Command used to open help dialog
         /// </summary>
-        public RelayCommand OpenHelpCommand { get; private set; }
+        public ICommand OpenHelpCommand { get; private set; }
 
-        public RelayCommand OpenWelcomeCommand { get; private set; }
+        public ICommand OpenWelcomeCommand { get; private set; }
 
         /// <summary>
         /// Command used to load tabs
         /// </summary>
-        public RelayCommand InitializeAsyncCommand { get; private set; }
+        public ICommand InitializeAsyncCommand { get; private set; }
 
         /// <summary>
         /// Command used to drop files
         /// </summary>
-        public RelayCommand<DragEventArgs> DropFileCommand { get; private set; }
+        public ICommand DropFileCommand { get; private set; }
 
         /// <summary>
         /// Command used to manage drag enter
         /// </summary>
-        public RelayCommand<DragEventArgs> DragEnterFileCommand { get; private set; }
+        public ICommand DragEnterFileCommand { get; private set; }
 
         /// <summary>
         /// Command used to manage drag leave
         /// </summary>
-        public RelayCommand<DragEventArgs> DragLeaveFileCommand { get; private set; }
+        public ICommand DragLeaveFileCommand { get; private set; }
 
         /// <summary>
         /// Register messages
@@ -294,14 +325,18 @@ namespace Popcorn.ViewModels.Windows
         {
             Messenger.Default.Register<ManageExceptionMessage>(this, e => ManageException(e.UnHandledException));
 
-            Messenger.Default.Register<LoadMovieMessage>(this, e => IsMovieFlyoutOpen = true);
+            Messenger.Default.Register<LoadMovieMessage>(this, e =>
+            {
+                IsCastFlyoutOpen = false;
+                IsMovieFlyoutOpen = true;
+            });
 
             Messenger.Default.Register<LoadShowMessage>(this, e => IsShowFlyoutOpen = true);
 
             Messenger.Default.Register<PlayShowEpisodeMessage>(this, message => DispatcherHelper.CheckBeginInvokeOnUI(
                 async () =>
                 {
-                    MediaPlayer = new MediaPlayerViewModel(_subtitlesService, _applicationService,
+                    MediaPlayer = new MediaPlayerViewModel(_subtitlesService, _cacheService,
                         message.Episode.FilePath,
                         message.Episode.Title,
                         MediaType.Show,
@@ -315,7 +350,7 @@ namespace Popcorn.ViewModels.Windows
                         },
                         message.BufferProgress,
                         message.BandwidthRate,
-                        message.Episode.SelectedSubtitle?.FilePath,
+                        message.Episode.SelectedSubtitle,
                         message.Episode.AvailableSubtitles);
 
                     ApplicationService.IsMediaPlaying = true;
@@ -337,7 +372,8 @@ namespace Popcorn.ViewModels.Windows
             Messenger.Default.Register<PlayMediaMessage>(this, message => DispatcherHelper.CheckBeginInvokeOnUI(
                 async () =>
                 {
-                    MediaPlayer = new MediaPlayerViewModel(_subtitlesService, _applicationService, message.MediaPath,
+                    MediaPlayer = new MediaPlayerViewModel(_subtitlesService, _cacheService,
+                        message.MediaPath,
                         message.MediaPath,
                         MediaType.Unkown,
                         () =>
@@ -371,7 +407,7 @@ namespace Popcorn.ViewModels.Windows
             Messenger.Default.Register<PlayMovieMessage>(this, message => DispatcherHelper.CheckBeginInvokeOnUI(
                 async () =>
                 {
-                    MediaPlayer = new MediaPlayerViewModel(_subtitlesService, _applicationService,
+                    MediaPlayer = new MediaPlayerViewModel(_subtitlesService, _cacheService,
                         message.Movie.FilePath, message.Movie.Title,
                         MediaType.Movie,
                         () =>
@@ -386,7 +422,7 @@ namespace Popcorn.ViewModels.Windows
                         },
                         message.BufferProgress,
                         message.BandwidthRate,
-                        message.Movie.SelectedSubtitle?.FilePath,
+                        message.Movie.SelectedSubtitle,
                         message.Movie.AvailableSubtitles);
 
                     ApplicationService.IsMediaPlaying = true;
@@ -408,7 +444,8 @@ namespace Popcorn.ViewModels.Windows
             Messenger.Default.Register<PlayTrailerMessage>(this, message => DispatcherHelper.CheckBeginInvokeOnUI(
                 async () =>
                 {
-                    MediaPlayer = new MediaPlayerViewModel(_subtitlesService, _applicationService, message.TrailerUrl,
+                    MediaPlayer = new MediaPlayerViewModel(_subtitlesService, _cacheService,
+                        message.TrailerUrl,
                         message.MovieTitle,
                         MediaType.Trailer,
                         message.TrailerStoppedAction, message.TrailerEndedAction);
@@ -517,6 +554,16 @@ namespace Popcorn.ViewModels.Windows
             Messenger.Default.Register<UpdateAvailableMessage>(this, message =>
             {
                 UpdateAvailable = true;
+            });
+
+            Messenger.Default.Register<SearchCastMessage>(this, message =>
+            {
+                IsCastFlyoutOpen = true;
+            });
+
+            Messenger.Default.Register<DownloadMagnetLinkMessage>(this, async message =>
+            {
+                await HandleTorrentDownload(message.MagnetLink);
             });
 
             _castMediaMessage = Messenger.Default.RegisterAsyncMessage<CastMediaMessage>(async message =>
@@ -657,10 +704,11 @@ namespace Popcorn.ViewModels.Windows
                 try
                 {
                     await _userService.UpdateUser();
-                    _localServer.Dispose();
+                    _localServer?.Dispose();
                     await SaveCacheOnExit();
                     Cef.Shutdown();
-                    ClearFolders();
+                    FileHelper.ClearFolders();
+                    ApiManager.ReleaseAll();
                 }
                 catch (Exception ex)
                 {
@@ -680,7 +728,7 @@ namespace Popcorn.ViewModels.Windows
                         var torrentFile = files?.FirstOrDefault(a => a.Contains("torrent"));
                         if (torrentFile != null)
                         {
-                            var vm = new DropTorrentDialogViewModel(torrentFile);
+                            var vm = new DropTorrentDialogViewModel(_cacheService, torrentFile);
                             var dropTorrentDialog = new DropTorrentDialog
                             {
                                 DataContext = vm
@@ -703,12 +751,20 @@ namespace Popcorn.ViewModels.Windows
 
                         Messenger.Default.Send(new DropFileMessage(DropFileMessage.DropFileEvent.Leave));
                     }
+                    else
+                    {
+                        Messenger.Default.Send(new DropFileMessage(DropFileMessage.DropFileEvent.Leave));
+                        Messenger.Default.Send(
+                            new UnhandledExceptionMessage(
+                                new NoDataInDroppedFileException(LocalizationProviderHelper.GetLocalizedValue<string>("NoMediaInDroppedTorrent"))));
+                    }
                 }
                 catch (Exception)
                 {
+                    Messenger.Default.Send(new DropFileMessage(DropFileMessage.DropFileEvent.Leave));
                     Messenger.Default.Send(
                         new UnhandledExceptionMessage(
-                            new PopcornException("An issue has occured while processing the dropped file.")));
+                            new PopcornException(LocalizationProviderHelper.GetLocalizedValue<string>("DroppedFileIssue"))));
                 }
             });
 
@@ -758,12 +814,20 @@ namespace Popcorn.ViewModels.Windows
                 await _dialogCoordinator.ShowMetroDialogAsync(this, welcomeDialog);
             });
 
-            InitializeAsyncCommand = new RelayCommand(() =>
+            InitializeAsyncCommand = new RelayCommand(async () =>
             {
                 var cmd = Environment.GetCommandLineArgs();
-                if (cmd.Any() && cmd.Contains("restart"))
+                if (cmd.Any())
                 {
-                    OpenAboutCommand.Execute(null);
+                    if (cmd.Contains("restart"))
+                    {
+                        OpenAboutCommand.Execute(null);
+                    }
+                    else if (cmd.Length == 2 && (cmd[1].StartsWith("magnet") || cmd[1].EndsWith("torrent")))
+                    {
+                        var path = cmd[1];
+                        await HandleTorrentDownload(path);
+                    }
                 }
 
                 try
@@ -815,12 +879,54 @@ namespace Popcorn.ViewModels.Windows
                     {
                         _localServer = WebApp.Start<Startup>(Constants.ServerUrl);
                     }
+
+                    await _popcornHubService.Start();
                 }
                 catch (Exception ex)
                 {
                     Logger.Error(ex);
                 }
             });
+        }
+
+        private async Task HandleTorrentDownload(string path)
+        {
+            var filePath = string.Empty;
+            if (path.StartsWith("magnet"))
+            {
+                filePath = $"{_cacheService.DropFilesDownloads}{Guid.NewGuid()}.torrent";
+                using (var file = File.Create(filePath))
+                using (var stream = new StreamWriter(file))
+                {
+                    await stream.WriteLineAsync(path);
+                }
+            }
+            else if (path.EndsWith("torrent"))
+            {
+                filePath = path;
+            }
+
+            var vm = new DropTorrentDialogViewModel(_cacheService, filePath);
+            var dropTorrentDialog = new DropTorrentDialog
+            {
+                DataContext = vm
+            };
+
+            try
+            {
+                Task.Run(async () =>
+                {
+                    await _dialogCoordinator.ShowMetroDialogAsync(this, dropTorrentDialog);
+                    var settings = SimpleIoc.Default.GetInstance<ApplicationSettingsViewModel>();
+                    await vm.Download(settings.UploadLimit, settings.DownloadLimit,
+                        async () => { await _dialogCoordinator.HideMetroDialogAsync(this, dropTorrentDialog); },
+                        async () => { await _dialogCoordinator.HideMetroDialogAsync(this, dropTorrentDialog); });
+                });
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex);
+            }
         }
 
         private bool FirewallRuleExists(string ruleName)
@@ -854,37 +960,6 @@ namespace Popcorn.ViewModels.Windows
         }
 
         /// <summary>
-        /// Clear download folders
-        /// </summary>
-        private void ClearFolders()
-        {
-            if (Directory.Exists(Constants.Subtitles))
-            {
-                FileHelper.DeleteFolder(Constants.Subtitles);
-            }
-
-            if (Directory.Exists(Constants.MovieDownloads))
-            {
-                FileHelper.DeleteFolder(Constants.MovieDownloads);
-            }
-
-            if (Directory.Exists(Constants.DropFilesDownloads))
-            {
-                FileHelper.DeleteFolder(Constants.DropFilesDownloads);
-            }
-
-            if (Directory.Exists(Constants.ShowDownloads))
-            {
-                FileHelper.DeleteFolder(Constants.ShowDownloads);
-            }
-
-            if (Directory.Exists(Constants.MovieTorrentDownloads))
-            {
-                FileHelper.DeleteFolder(Constants.MovieTorrentDownloads);
-            }
-        }
-
-        /// <summary>
         /// Display a dialog on unhandled exception
         /// </summary>
         /// <param name="sender">Sender</param>
@@ -907,10 +982,6 @@ namespace Popcorn.ViewModels.Windows
         {
             DispatcherHelper.CheckBeginInvokeOnUI(() =>
             {
-                //IsMovieFlyoutOpen = false;
-                //IsShowFlyoutOpen = false;
-                //IsSettingsFlyoutOpen = false;
-
                 if (exception is WebException || exception is SocketException || exception is TimeoutRejectedException)
                 {
                     _applicationService.IsConnectionInError = true;
@@ -919,7 +990,8 @@ namespace Popcorn.ViewModels.Windows
                         .Background("#333")
                         .HasBadge("Error")
                         .HasMessage(LocalizationProviderHelper.GetLocalizedValue<string>("EmbarrassingError"))
-                        .HasMessage(LocalizationProviderHelper.GetLocalizedValue<string>("ConnectionErrorDescriptionPopup"))
+                        .HasMessage(
+                            LocalizationProviderHelper.GetLocalizedValue<string>("ConnectionErrorDescriptionPopup"))
                         .Dismiss().WithButton(LocalizationProviderHelper.GetLocalizedValue<string>("Ignore"),
                             button => { })
                         .Queue();
@@ -935,53 +1007,22 @@ namespace Popcorn.ViewModels.Windows
                             button => { })
                         .Queue();
                 }
-                else
+                else if (exception is NoDataInDroppedFileException)
                 {
                     _manager.CreateMessage()
-                        .Accent("#E82C0C")
+                        .Accent("#E0A030")
                         .Background("#333")
-                        .HasBadge("Error")
-                        .HasMessage(LocalizationProviderHelper.GetLocalizedValue<string>("EmbarrassingError"))
+                        .HasBadge("Warning")
                         .HasMessage(exception.Message)
-                        .WithButton(LocalizationProviderHelper.GetLocalizedValue<string>("Restart"), button =>
-                        {
-                            Process.Start(Application.ResourceAssembly.Location);
-                            Application.Current.Shutdown();
-                        })
-                        .Dismiss().WithButton(LocalizationProviderHelper.GetLocalizedValue<string>("Ignore"),
+                        .Dismiss().WithButton(LocalizationProviderHelper.GetLocalizedValue<string>("Dismiss"),
                             button => { })
                         .Queue();
                 }
+                else
+                {
+                    Logger.Fatal(exception);
+                }
             });
-        }
-
-        /// <summary>
-        /// Dispose
-        /// </summary>
-        public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-
-        /// <summary>
-        /// Dispose
-        /// </summary>
-        /// <param name="disposing"></param>
-        protected virtual void Dispose(bool disposing)
-        {
-            if (_disposed)
-                return;
-
-            if (disposing)
-            {
-                _customSubtitleMessage?.Dispose();
-                _castMediaMessage?.Dispose();
-                _showSubtitleDialogMessage?.Dispose();
-                _showTraktDialogMessage?.Dispose();
-            }
-
-            _disposed = true;
         }
     }
 }

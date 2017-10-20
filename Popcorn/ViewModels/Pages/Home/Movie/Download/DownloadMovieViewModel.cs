@@ -16,13 +16,14 @@ using Popcorn.ViewModels.Windows.Settings;
 using Popcorn.Services.Download;
 using GalaSoft.MvvmLight.Ioc;
 using Popcorn.Models.Bandwidth;
+using Popcorn.Services.Cache;
 
 namespace Popcorn.ViewModels.Pages.Home.Movie.Download
 {
     /// <summary>
     /// Manage the download of a movie
     /// </summary>
-    public class DownloadMovieViewModel : ViewModelBase, IDisposable
+    public class DownloadMovieViewModel : ViewModelBase
     {
         /// <summary>
         /// Logger of the class
@@ -70,22 +71,24 @@ namespace Popcorn.ViewModels.Pages.Home.Movie.Download
         private int _nbPeers;
 
         /// <summary>
-        /// Disposed
-        /// </summary>
-        private bool _disposed;
-
-        /// <summary>
         /// Token to cancel the download
         /// </summary>
         private CancellationTokenSource CancellationDownloadingMovie { get; set; }
+
+        /// <summary>
+        /// The cache service
+        /// </summary>
+        private readonly ICacheService _cacheService;
 
         /// <summary>
         /// Initializes a new instance of the DownloadMovieViewModel class.
         /// </summary>
         /// <param name="subtitlesService">Instance of SubtitlesService</param>
         /// <param name="downloadService">Download service</param>
-        public DownloadMovieViewModel(ISubtitlesService subtitlesService, IDownloadService<MovieJson> downloadService)
+        /// <param name="cacheService">Cache service</param>
+        public DownloadMovieViewModel(ISubtitlesService subtitlesService, IDownloadService<MovieJson> downloadService, ICacheService cacheService)
         {
+            _cacheService = cacheService;
             _subtitlesService = subtitlesService;
             _downloadService = downloadService;
             CancellationDownloadingMovie = new CancellationTokenSource();
@@ -208,7 +211,7 @@ namespace Popcorn.ViewModels.Pages.Home.Movie.Download
                             message.Movie.SelectedSubtitle.Sub.LanguageName !=
                             LocalizationProviderHelper.GetLocalizedValue<string>("NoneLabel"))
                         {
-                            var path = Path.Combine(Constants.Subtitles + message.Movie.ImdbCode);
+                            var path = Path.Combine(_cacheService.Subtitles + message.Movie.ImdbCode);
                             Directory.CreateDirectory(path);
                             var subtitlePath = await
                                 _subtitlesService.DownloadSubtitleToPath(path,
@@ -232,7 +235,7 @@ namespace Popcorn.ViewModels.Pages.Home.Movie.Download
                             var result =
                                 await
                                     DownloadFileHelper.DownloadFileTaskAsync(torrentUrl,
-                                        Constants.MovieTorrentDownloads + Movie.ImdbCode + ".torrent");
+                                        _cacheService.MovieTorrentDownloads + Movie.ImdbCode + ".torrent");
                             var torrentPath = string.Empty;
                             if (result.Item3 == null && !string.IsNullOrEmpty(result.Item2))
                                 torrentPath = result.Item2;
@@ -287,32 +290,6 @@ namespace Popcorn.ViewModels.Pages.Home.Movie.Download
         private void ReportMovieDownloadProgress(double value)
         {
             MovieDownloadProgress = value;
-        }
-
-        /// <summary>
-        /// Dispose
-        /// </summary>
-        public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-
-        /// <summary>
-        /// Dispose
-        /// </summary>
-        /// <param name="disposing"></param>
-        protected virtual void Dispose(bool disposing)
-        {
-            if (_disposed)
-                return;
-
-            if (disposing)
-            {
-                CancellationDownloadingMovie?.Dispose();
-            }
-
-            _disposed = true;
         }
     }
 }

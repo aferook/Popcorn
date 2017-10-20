@@ -21,7 +21,6 @@ using Popcorn.Utils.Exceptions;
 using Popcorn.ViewModels.Windows.Settings;
 using System.Runtime.CompilerServices;
 using System.ComponentModel;
-using System.Linq;
 using GalaSoft.MvvmLight.CommandWpf;
 
 namespace Popcorn.UserControls.Player
@@ -29,17 +28,12 @@ namespace Popcorn.UserControls.Player
     /// <summary>
     /// Interaction logic for PlayerUserControl.xaml
     /// </summary>
-    public partial class PlayerUserControl : IDisposable, INotifyPropertyChanged
+    public partial class PlayerUserControl : INotifyPropertyChanged
     {
         /// <summary>
         /// Logger of the class
         /// </summary>
         private static Logger Logger { get; } = LogManager.GetCurrentClassLogger();
-
-        /// <summary>
-        /// If control is disposed
-        /// </summary>
-        private bool _disposed;
 
         /// <summary>
         /// Indicates if a media is playing
@@ -69,6 +63,11 @@ namespace Popcorn.UserControls.Player
         private ICommand _setLowerSubtitleSizeCommand;
 
         private ICommand _setHigherSubtitleSizeCommand;
+
+        /// <summary>
+        /// Application service
+        /// </summary>
+        private readonly IApplicationService _applicationService;
 
         /// <summary>
         /// Subtitle size
@@ -113,15 +112,36 @@ namespace Popcorn.UserControls.Player
             }
 
             var applicationSettings = SimpleIoc.Default.GetInstance<ApplicationSettingsViewModel>();
+            _applicationService = SimpleIoc.Default.GetInstance<IApplicationService>();
             _subtitleSize = applicationSettings.SelectedSubtitleSize.Size;
             VlcOptions = new[]
             {
-                "-I", "--dummy-quiet", "--no-video-title", "--no-sub-autodetect-file", "--sub-filter=freetype",
+                "-I", "--dummy-quiet", "--no-video-title", "--no-sub-autodetect-file",
                 $"--freetype-color={HexConverter(applicationSettings.SubtitlesColor)}",
-                $"--freetype-rel-fontsize={applicationSettings.SelectedSubtitleSize.Size}"
+                $"--freetype-rel-fontsize={applicationSettings.SelectedSubtitleSize.Size}",
+                "--file-caching=5000", "--network-caching=5000"
             };
             InitializeComponent();
+            EventManager.RegisterClassHandler(
+                typeof(UIElement),
+                Keyboard.PreviewKeyDownEvent,
+                new KeyEventHandler(OnPreviewKeyDownEvent));
+
             Loaded += OnLoaded;
+        }
+
+        private void OnPreviewKeyDownEvent(object sender,
+            RoutedEventArgs e)
+        {
+            KeyEventArgs ke = e as KeyEventArgs;
+            if (ke.Key == Key.Space)
+            {
+                ke.Handled = true;
+                if (MediaPlayerIsPlaying)
+                    PauseMedia();
+                else
+                    PlayMedia();
+            }
         }
 
         /// <summary>
@@ -180,11 +200,6 @@ namespace Popcorn.UserControls.Player
         public string[] VlcOptions { get; set; }
 
         /// <summary>
-        /// Free resources
-        /// </summary>
-        public void Dispose() => Dispose(true);
-
-        /// <summary>
         /// Subscribe to events and play the movie when control has been loaded
         /// </summary>
         /// <param name="sender">Sender object</param>
@@ -195,7 +210,7 @@ namespace Popcorn.UserControls.Player
             if (window != null)
             {
                 window.KeyDown += OnKeyDown;
-                window.Closing += (s1, e1) => Dispose();
+                window.Closing += (s1, e1) => Unload();
             }
 
             var vm = DataContext as MediaPlayerViewModel;
@@ -217,7 +232,6 @@ namespace Popcorn.UserControls.Player
                 if (_subtitleSize == 12)
                 {
                     Player.VlcOption[5] = $"--freetype-rel-fontsize={_subtitleSize}";
-
                 }
                 else
                 {
@@ -276,7 +290,7 @@ namespace Popcorn.UserControls.Player
 
         private void OnCastStopped(object sender, EventArgs e)
         {
-            if(Player.VlcMediaPlayer.IsMute)
+            if (Player.VlcMediaPlayer.IsMute)
                 Player.VlcMediaPlayer.ToggleMute();
         }
 
@@ -339,7 +353,7 @@ namespace Popcorn.UserControls.Player
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
-        private void OnStopped(object sender, Meta.Vlc.ObjectEventArgs<Meta.Vlc.Interop.Media.MediaState> e)
+        private void OnStopped(object sender, Popcorn.Vlc.ObjectEventArgs<Popcorn.Vlc.Interop.Media.MediaState> e)
         {
             DispatcherHelper.CheckBeginInvokeOnUI(() =>
             {
@@ -352,7 +366,7 @@ namespace Popcorn.UserControls.Player
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
-        private void OnPlaying(object sender, Meta.Vlc.ObjectEventArgs<Meta.Vlc.Interop.Media.MediaState> e)
+        private void OnPlaying(object sender, Popcorn.Vlc.ObjectEventArgs<Popcorn.Vlc.Interop.Media.MediaState> e)
         {
             DispatcherHelper.CheckBeginInvokeOnUI(() =>
             {
@@ -591,6 +605,7 @@ namespace Popcorn.UserControls.Player
                 vm.PlayCastCommand.Execute(null);
             }
 
+            _applicationService.SwitchConstantDisplayAndPower(true);
             Player.Play();
             MediaPlayerIsPlaying = true;
             MediaPlayerStatusBarItemPlay.Visibility = Visibility.Collapsed;
@@ -608,6 +623,7 @@ namespace Popcorn.UserControls.Player
                 vm.PauseCastCommand.Execute(null);
             }
 
+            _applicationService.SwitchConstantDisplayAndPower(false);
             Player.Pause();
             MediaPlayerIsPlaying = false;
             MediaPlayerStatusBarItemPlay.Visibility = Visibility.Visible;
@@ -619,7 +635,7 @@ namespace Popcorn.UserControls.Player
         /// </summary>
         /// <param name="sender">Sender object</param>
         /// <param name="e">EventArgs</param>
-        private void OnStoppedMedia(object sender, EventArgs e) => Dispose();
+        private void OnStoppedMedia(object sender, EventArgs e) => Unload();
 
         /// <summary>
         /// Each time the CanExecute play command change, update the visibility of Play/Pause buttons in the player
@@ -837,58 +853,56 @@ namespace Popcorn.UserControls.Player
         /// <summary>
         /// Dispose the control
         /// </summary>
-        /// <param name="disposing">If a disposing is already processing</param>
-        private void Dispose(bool disposing)
+        private void Unload()
         {
-            if (_disposed)
-                return;
-
-            Loaded -= OnLoaded;
-            ActivityTimer.Tick -= OnInactivity;
-            ActivityTimer.Stop();
-
-            InputManager.Current.PreProcessInput -= OnActivity;
-
-            Player.TimeChanged -= OnTimeChanged;
-            Player.VlcMediaPlayer.EncounteredError -= EncounteredError;
-            Player.VlcMediaPlayer.EndReached -= MediaPlayerEndReached;
-            MediaPlayerIsPlaying = false;
-            var window = System.Windows.Window.GetWindow(this);
-            if (window != null)
+            try
             {
-                window.KeyDown -= OnKeyDown;
-                window.Cursor = Cursors.Arrow;
-            }
+                Loaded -= OnLoaded;
+                ActivityTimer.Tick -= OnInactivity;
+                ActivityTimer.Stop();
 
-            var vm = DataContext as MediaPlayerViewModel;
-            if (vm != null)
-            {
-                vm.CastPlayerTimeChanged -= CastPlayerTimeChanged;
-                vm.SubtitleChosen -= OnSubtitleChosen;
-                vm.StoppedMedia -= OnStoppedMedia;
-                vm.ResumedMedia -= OnResumedMedia;
-                vm.PausedMedia -= OnPausedMedia;
-            }
+                InputManager.Current.PreProcessInput -= OnActivity;
 
-            if (vm?.BufferProgress != null)
-            {
-                vm.BufferProgress.ProgressChanged -= OnBufferProgressChanged;
-            }
+                Player.TimeChanged -= OnTimeChanged;
+                Player.VlcMediaPlayer.EncounteredError -= EncounteredError;
+                Player.VlcMediaPlayer.EndReached -= MediaPlayerEndReached;
+                MediaPlayerIsPlaying = false;
+                var window = System.Windows.Window.GetWindow(this);
+                if (window != null)
+                {
+                    window.KeyDown -= OnKeyDown;
+                    window.Cursor = Cursors.Arrow;
+                }
 
-            if (vm?.BandwidthRate != null)
-            {
-                vm.BandwidthRate.ProgressChanged -= OnBandwidthChanged;
-            }
+                var vm = DataContext as MediaPlayerViewModel;
+                if (vm != null)
+                {
+                    vm.CastPlayerTimeChanged -= CastPlayerTimeChanged;
+                    vm.SubtitleChosen -= OnSubtitleChosen;
+                    vm.StoppedMedia -= OnStoppedMedia;
+                    vm.ResumedMedia -= OnResumedMedia;
+                    vm.PausedMedia -= OnPausedMedia;
+                }
 
-            Task.Run(async () =>
-            {
-                await Task.Delay(500);
+                if (vm?.BufferProgress != null)
+                {
+                    vm.BufferProgress.ProgressChanged -= OnBufferProgressChanged;
+                }
+
+                if (vm?.BandwidthRate != null)
+                {
+                    vm.BandwidthRate.ProgressChanged -= OnBandwidthChanged;
+                }
+
                 Player.Dispose();
-            });
-
-            _disposed = true;
-            if (disposing)
-                GC.SuppressFinalize(this);
+                _applicationService.SwitchConstantDisplayAndPower(false);
+                RemoveHandler(Keyboard.PreviewKeyDownEvent,
+                    new KeyEventHandler(OnPreviewKeyDownEvent));
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex);
+            }
         }
     }
 }

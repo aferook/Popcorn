@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Reactive.Linq;
 using System.Threading.Tasks;
@@ -102,6 +103,11 @@ namespace Popcorn.Services.User
             if (User.ShowHistory == null)
             {
                 User.ShowHistory = new List<ShowHistory>();
+            }
+
+            if (User.CacheLocation == null)
+            {
+                User.CacheLocation = Path.GetTempPath() + @"Popcorn";
             }
 
             if (User.DefaultSubtitleSize == null)
@@ -404,6 +410,52 @@ namespace Popcorn.Services.User
             User.DefaultSubtitleSize = size;
         }
 
+        public string GetCacheLocationPath()
+        {
+            return User.CacheLocation;
+        }
+
+        public void SetCacheLocationPath(string path)
+        {
+            User.CacheLocation = path;
+        }
+
+        /// <summary>
+        /// True if torrent file association is enabled
+        /// </summary>
+        /// <returns></returns>
+        public bool GetTorrentFileAssociation()
+        {
+            return User.EnableTorrentFileAssociation;
+        }
+
+        /// <summary>
+        /// Set if torrent file association is enabled
+        /// </summary>
+        /// <param name="enableTorrentFileAssociation"></param>
+        public void SetTorrentFileAssociation(bool enableTorrentHandle)
+        {
+            User.EnableTorrentFileAssociation = enableTorrentHandle;
+        }
+
+        /// <summary>
+        /// Get if magnet link association is enabled
+        /// </summary>
+        /// <returns></returns>
+        public bool GetMagnetLinkAssociation()
+        {
+            return User.EnableMagnetLinkAssociation;
+        }
+
+        /// <summary>
+        /// Set if magnet link association is enabled
+        /// </summary>
+        /// <param name="enableMagnetLinkAssociation"></param>
+        public void SetMagnetLinkAssociation(bool enableMagnetLinkAssociation)
+        {
+            User.EnableMagnetLinkAssociation = enableMagnetLinkAssociation;
+        }
+
         /// <summary>
         /// Get all available languages from the database
         /// </summary>
@@ -431,29 +483,37 @@ namespace Popcorn.Services.User
         /// <returns>Current language</returns>
         public Language GetCurrentLanguage()
         {
-            Language currentLanguage;
-            var language = User.Language;
-            if (language != null)
+            try
             {
-                switch (language.Culture)
+                Language currentLanguage;
+                var language = User.Language;
+                if (language != null)
                 {
-                    case "fr":
-                        currentLanguage = new FrenchLanguage();
-                        break;
-                    case "es":
-                        currentLanguage = new SpanishLanguage();
-                        break;
-                    default:
-                        currentLanguage = new EnglishLanguage();
-                        break;
+                    switch (language.Culture)
+                    {
+                        case "fr":
+                            currentLanguage = new FrenchLanguage();
+                            break;
+                        case "es":
+                            currentLanguage = new SpanishLanguage();
+                            break;
+                        default:
+                            currentLanguage = new EnglishLanguage();
+                            break;
+                    }
                 }
-            }
-            else
-            {
-                currentLanguage = new EnglishLanguage();
-            }
+                else
+                {
+                    currentLanguage = new EnglishLanguage();
+                }
 
-            return currentLanguage;
+                return currentLanguage;
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex);
+                return new EnglishLanguage();
+            }
         }
 
         /// <summary>

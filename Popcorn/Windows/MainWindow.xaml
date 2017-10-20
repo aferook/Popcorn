@@ -3,6 +3,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:adorners="clr-namespace:Popcorn.Adorners;assembly=Popcorn.Adorners"
+    xmlns:cast="clr-namespace:Popcorn.UserControls.Home.Movie.Cast"
     xmlns:command="clr-namespace:GalaSoft.MvvmLight.Command;assembly=GalaSoft.MvvmLight.Platform"
     xmlns:controls="clr-namespace:MahApps.Metro.Controls;assembly=MahApps.Metro"
     xmlns:controls1="clr-namespace:Enterwell.Clients.Wpf.Notifications.Controls;assembly=Enterwell.Clients.Wpf.Notifications"
@@ -26,6 +27,7 @@
     lex:LocalizeDictionary.DesignCulture="en"
     lex:ResxLocalizationProvider.DefaultAssembly="Popcorn"
     lex:ResxLocalizationProvider.DefaultDictionary="Resources"
+    Activated="OnActivated"
     AllowDrop="True"
     DataContext="{Binding Window, Source={StaticResource Locator}}"
     Icon="../Resources/Images/icon.ico"
@@ -71,10 +73,6 @@
 
         <i:EventTrigger EventName="Closing">
             <command:EventToCommand Command="{Binding Mode=OneWay, Path=MainWindowClosingCommand}" PassEventArgsToCommand="False" />
-        </i:EventTrigger>
-
-        <i:EventTrigger EventName="Loaded">
-            <command:EventToCommand Command="{Binding Mode=OneWay, Path=InitializeAsyncCommand}" PassEventArgsToCommand="False" />
         </i:EventTrigger>
     </i:Interaction.Triggers>
 
@@ -128,6 +126,16 @@
                 IsOpen="{Binding IsMovieFlyoutOpen}"
                 Position="Right">
                 <details:MovieDetailsUserControl x:Name="MovieDetailsUc" />
+            </controls:Flyout>
+            <controls:Flyout
+                Width="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType=controls:MetroWindow}, Path=ActualWidth, Mode=OneWay}"
+                Margin="0.01,0,0,0"
+                AnimateOpacity="True"
+                Header="{Binding Cast.Person.Name, Source={StaticResource Locator}}"
+                HeaderTemplate="{Binding Source={StaticResource FlyoutHeaderTemplate}}"
+                IsOpen="{Binding IsCastFlyoutOpen}"
+                Position="Right">
+                <cast:CastUserControl x:Name="CastUc" />
             </controls:Flyout>
             <controls:Flyout
                 Header="{lex:LocText SettingsMenuTitle}"

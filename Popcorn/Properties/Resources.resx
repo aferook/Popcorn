@@ -468,4 +468,19 @@
   <data name="Dismiss" xml:space="preserve">
     <value>Dismiss</value>
   </data>
+  <data name="UpdatedTitleTab" xml:space="preserve">
+    <value>Updated</value>
+  </data>
+  <data name="ChangeLocation" xml:space="preserve">
+    <value>Change location</value>
+  </data>
+  <data name="DroppedFileIssue" xml:space="preserve">
+    <value>An issue has occurred while processing the dropped file.</value>
+  </data>
+  <data name="MagnetLinkAssociationLabel" xml:space="preserve">
+    <value>Associate with magnet links</value>
+  </data>
+  <data name="TorrentFileAssociationLabel" xml:space="preserve">
+    <value>Associate with torrent files</value>
+  </data>
 </root>

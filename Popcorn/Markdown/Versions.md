@@ -1,4 +1,79 @@
-﻿# 3.0.0 - 27/09/2017 #
+﻿# 3.2.0 - 19/10/2017 #
+***
+Fixed issues
+
+### Details ###
+* Fixed issue [#109](https://github.com/bbougot/Popcorn/issues/109).
+* Fixed issue [#112](https://github.com/bbougot/Popcorn/issues/112).
+* Fixed issue [#115](https://github.com/bbougot/Popcorn/issues/115).
+* Fixed issue [#117](https://github.com/bbougot/Popcorn/issues/117).
+* Fixed issue [#118](https://github.com/bbougot/Popcorn/issues/118).
+
+# 3.1.2 - 14/10/2017 #
+***
+Minor improvement
+
+### Details ###
+* Improved UI
+
+# 3.1.1 - 13/10/2017 #
+***
+Minor improvement
+
+### Details ###
+* Improved image quality
+
+# 3.1.0 - 13/10/2017 #
+***
+Add Actor page
+
+### Details ###
+* Added Actor page
+* Various performance improvements
+
+# 3.0.5 - 11/10/2017 #
+***
+Various improvements
+
+### Details ###
+* Improved performances
+* Improved stability
+
+# 3.0.4 - 10/10/2017 #
+***
+Fixed issues
+
+### Details ###
+* Fixed issue [#102](https://github.com/bbougot/Popcorn/issues/102).
+* Fixed issue [#103](https://github.com/bbougot/Popcorn/issues/103).
+* Fixed issue [#106](https://github.com/bbougot/Popcorn/issues/106).
+* Fixed issue [#107](https://github.com/bbougot/Popcorn/issues/107).
+
+# 3.0.3 - 05/10/2017 #
+***
+Fixed issues
+
+### Details ###
+* Fixed cache issue
+* Add arrow navigation
+
+# 3.0.2 - 05/10/2017 #
+***
+Fixed issues
+
+### Details ###
+* Fixed #101
+* Fixed #98
+
+# 3.0.1 - 02/10/2017 #
+***
+Various improvements
+
+### Details ###
+* Fix issues
+* Add torrent and magnet association
+
+# 3.0.0 - 27/09/2017 #
 ***
 Various improvements
 

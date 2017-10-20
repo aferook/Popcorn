@@ -3,7 +3,10 @@ using Enterwell.Clients.Wpf.Notifications;
 using GalaSoft.MvvmLight.Ioc;
 using Microsoft.Practices.ServiceLocation;
 using Popcorn.Services.Application;
+using Popcorn.Services.Associations;
+using Popcorn.Services.Cache;
 using Popcorn.Services.Genres;
+using Popcorn.Services.Hub;
 using Popcorn.Services.Movies.Movie;
 using Popcorn.Services.Movies.Trailer;
 using Popcorn.Services.Shows.Show;
@@ -18,6 +21,7 @@ using Popcorn.ViewModels.Windows;
 using Popcorn.ViewModels.Windows.Settings;
 using Popcorn.Services.Shows.Trailer;
 using Popcorn.Services.Trakt;
+using Popcorn.ViewModels.Pages.Home.Cast;
 
 namespace Popcorn.ViewModels
 {
@@ -43,6 +47,9 @@ namespace Popcorn.ViewModels
             SimpleIoc.Default.Register<ISubtitlesService, SubtitlesService>();
             SimpleIoc.Default.Register<IGenreService, GenreService>();
             SimpleIoc.Default.Register<ITraktService, TraktService>();
+            SimpleIoc.Default.Register<IPopcornHubService, PopcornHubService>();
+            SimpleIoc.Default.Register<ICacheService, CacheService>();
+            SimpleIoc.Default.Register<IFileAssociationService, FileAssociationService>();
             SimpleIoc.Default.Register<NotificationMessageManager>();
 
             #endregion
@@ -57,6 +64,8 @@ namespace Popcorn.ViewModels
 
             SimpleIoc.Default.Register<ShowPageViewModel>();
             SimpleIoc.Default.Register<ShowDetailsViewModel>();
+
+            SimpleIoc.Default.Register<CastViewModel>();
 
             SimpleIoc.Default.Register<ApplicationSettingsViewModel>();
 
@@ -94,6 +103,14 @@ namespace Popcorn.ViewModels
             "CA1822:MarkMembersAsStatic",
             Justification = "This non-static member is needed for data binding purposes.")]
         public ShowDetailsViewModel ShowDetails => ServiceLocator.Current.GetInstance<ShowDetailsViewModel>();
+
+        /// <summary>
+        /// Gets the Cast property.
+        /// </summary>
+        [SuppressMessage("Microsoft.Performance",
+            "CA1822:MarkMembersAsStatic",
+            Justification = "This non-static member is needed for data binding purposes.")]
+        public CastViewModel Cast => ServiceLocator.Current.GetInstance<CastViewModel>();
 
         /// <summary>
         /// Gets the ApplicationSettings property.

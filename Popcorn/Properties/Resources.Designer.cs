@@ -196,6 +196,15 @@ namespace Popcorn.Properties {
         }
         
         /// <summary>
+        ///   Recherche une chaîne localisée semblable à Change location.
+        /// </summary>
+        public static string ChangeLocation {
+            get {
+                return ResourceManager.GetString("ChangeLocation", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Recherche une chaîne localisée semblable à Choose a Chromecast.
         /// </summary>
         public static string ChooseChromecastLabel {
@@ -372,6 +381,15 @@ namespace Popcorn.Properties {
         public static string DownloadLimitLabel {
             get {
                 return ResourceManager.GetString("DownloadLimitLabel", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Recherche une chaîne localisée semblable à An issue has occurred while processing the dropped file..
+        /// </summary>
+        public static string DroppedFileIssue {
+            get {
+                return ResourceManager.GetString("DroppedFileIssue", resourceCulture);
             }
         }
         
@@ -588,6 +606,15 @@ namespace Popcorn.Properties {
         public static string Logout {
             get {
                 return ResourceManager.GetString("Logout", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Recherche une chaîne localisée semblable à Associate with magnet links.
+        /// </summary>
+        public static string MagnetLinkAssociationLabel {
+            get {
+                return ResourceManager.GetString("MagnetLinkAssociationLabel", resourceCulture);
             }
         }
         
@@ -997,6 +1024,15 @@ namespace Popcorn.Properties {
         }
         
         /// <summary>
+        ///   Recherche une chaîne localisée semblable à Associate with torrent files.
+        /// </summary>
+        public static string TorrentFileAssociationLabel {
+            get {
+                return ResourceManager.GetString("TorrentFileAssociationLabel", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Recherche une chaîne localisée semblable à Trailer.
         /// </summary>
         public static string TrailerButton {
@@ -1038,6 +1074,15 @@ namespace Popcorn.Properties {
         public static string UpdateApplied {
             get {
                 return ResourceManager.GetString("UpdateApplied", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Recherche une chaîne localisée semblable à Updated.
+        /// </summary>
+        public static string UpdatedTitleTab {
+            get {
+                return ResourceManager.GetString("UpdatedTitleTab", resourceCulture);
             }
         }
         

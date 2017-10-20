@@ -11,6 +11,7 @@
   [![Gitter](https://img.shields.io/badge/Gitter-Join%20Chat-green.svg?style=flat-square)](https://gitter.im/popcorn-app/popcorn) <a href="https://popcorn-slack.azurewebsites.net" target="_blank">
     <img alt="Slack" src="http://popcorn-slack.azurewebsites.net/badge.svg">
   </a>
+   [![Releases](https://img.shields.io/github/release/bbougot/Popcorn.svg)](https://github.com/bbougot/Popcorn/releases)
   [![Build status](https://ci.appveyor.com/api/projects/status/mjnfwck6otg9c5wj/branch/master?svg=true)](https://ci.appveyor.com/project/bbougot/popcorn/branch/master)
   [![Quality Gate](https://sonarqube.com/api/badges/gate?key=Popcorn)](https://sonarqube.com/dashboard/index/Popcorn)
   [![Coverage Status](https://coveralls.io/repos/github/bbougot/Popcorn/badge.svg?branch=master)](https://coveralls.io/github/bbougot/Popcorn?branch=master) 
@@ -54,7 +55,7 @@ The assets (images and torrent files) are stored on Azure Blob Storage.
 Windows 7+ is supported (Windows 7, 8, 8.1, 10).
 
 ## Installation
-Download installer [here](https://github.com/bbougot/Popcorn/releases/download/v2.9.0/PopcornInstaller.exe) 
+Download installer [here](https://github.com/bbougot/Popcorn/releases/download/v3.2.0/PopcornInstaller.exe) 
 
 ## Todos
 See the [roadmap](https://github.com/bbougot/Popcorn/projects/1) for the full list.
@@ -69,6 +70,9 @@ See the [roadmap](https://github.com/bbougot/Popcorn/projects/1) for the full li
 
 ### Show Page
 ![Show Page](https://github.com/bbougot/Popcorn/blob/master/Screenshots/Screen3.jpg)
+
+### Actor Page
+![Show Page](https://github.com/bbougot/Popcorn/blob/master/Screenshots/Screen4.jpg)
 
 ## License
 If you distribute a copy or make a fork of the project, you have to credit this project as source.

@@ -10,8 +10,10 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
+using GalaSoft.MvvmLight.Ioc;
 using GalaSoft.MvvmLight.Threading;
 using NLog;
+using Popcorn.Services.Cache;
 using Popcorn.Utils;
 
 namespace Popcorn.AttachedProperties
@@ -20,7 +22,8 @@ namespace Popcorn.AttachedProperties
     {
         Thumbnail,
         Poster,
-        Backdrop
+        Backdrop,
+        None
     }
 
     /// <summary>
@@ -121,14 +124,11 @@ namespace Popcorn.AttachedProperties
                                 return;
                             }
 
-                            string localFile;
                             var hash = Convert.ToBase64String(Encoding.UTF8.GetBytes(path));
                             var mustDownload = false;
-                            if (File.Exists(Constants.Assets + hash))
-                            {
-                                localFile = Constants.Assets + hash;
-                            }
-                            else
+                            var cacheService = SimpleIoc.Default.GetInstance<ICacheService>();
+                            var localFile = cacheService.Assets + hash;
+                            if(!File.Exists(localFile))
                             {
                                 mustDownload = true;
                                 if (imageType == ImageType.Thumbnail)
@@ -162,8 +162,6 @@ namespace Popcorn.AttachedProperties
                                     image.RenderTransformOrigin = new Point(0.5, 0.5);
                                     image.RenderTransform = loadingAnimationTransform;
                                 }
-
-                                localFile = Constants.Assets + hash;
                             }
 
                             await Task.Run(async () =>
@@ -179,10 +177,10 @@ namespace Popcorn.AttachedProperties
                                                 using (var stream = new MemoryStream())
                                                 {
                                                     await ms.CopyToAsync(stream).ConfigureAwait(false);
-                                                    if (!File.Exists(Constants.Assets + hash))
+                                                    if (!File.Exists(cacheService.Assets + hash))
                                                     {
                                                         using (var fs =
-                                                            new FileStream(Constants.Assets + hash, FileMode.Create,
+                                                            new FileStream(localFile, FileMode.Create,
                                                                 FileAccess.ReadWrite, FileShare.ReadWrite, 4096, true))
                                                         {
                                                             var writeAsync = stream.ToArray();
@@ -207,10 +205,10 @@ namespace Popcorn.AttachedProperties
                                         }
                                         else if (imageType == ImageType.Poster)
                                         {
-                                            bitmapImage.DecodePixelWidth = 800;
-                                            bitmapImage.DecodePixelHeight = 1200;
+                                            bitmapImage.DecodePixelWidth = 500;
+                                            bitmapImage.DecodePixelHeight = 750;
                                         }
-                                        else
+                                        else if (imageType != ImageType.None)
                                         {
                                             bitmapImage.DecodePixelWidth = 1920;
                                             bitmapImage.DecodePixelHeight = 1080;
@@ -241,19 +239,22 @@ namespace Popcorn.AttachedProperties
                         }
                         catch (Exception ex)
                         {
-                            Logger.Error(ex);
-                            if (imageType == ImageType.Thumbnail)
+                            DispatcherHelper.CheckBeginInvokeOnUI(() =>
                             {
-                                var errorThumbnail = resourceDictionary["ImageError"] as DrawingImage;
-                                errorThumbnail.Freeze();
-                                image.RenderTransformOrigin = new Point(0.5d, 0.5d);
-                                image.Stretch = Stretch.None;
-                                image.Source = errorThumbnail;
-                            }
-                            else
-                            {
-                                image.Source = new BitmapImage();
-                            }
+                                Logger.Error(ex);
+                                if (imageType == ImageType.Thumbnail)
+                                {
+                                    var errorThumbnail = resourceDictionary["ImageError"] as DrawingImage;
+                                    errorThumbnail.Freeze();
+                                    image.RenderTransformOrigin = new Point(0.5d, 0.5d);
+                                    image.Stretch = Stretch.None;
+                                    image.Source = errorThumbnail;
+                                }
+                                else
+                                {
+                                    image.Source = new BitmapImage();
+                                }
+                            });
                         }
                     }
                 }

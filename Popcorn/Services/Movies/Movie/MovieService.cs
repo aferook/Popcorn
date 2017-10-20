@@ -20,6 +20,9 @@ using Popcorn.YTVideoProvider;
 using Polly;
 using Polly.Timeout;
 using Popcorn.Extensions;
+using TMDbLib.Objects.Find;
+using TMDbLib.Objects.General;
+using TMDbLib.Objects.People;
 using Utf8Json;
 
 namespace Popcorn.Services.Movies.Movie
@@ -71,12 +74,14 @@ namespace Popcorn.Services.Movies.Movie
                                             MovieMethods.Credits).ConfigureAwait(false);
                                         if (movieToTranslate is MovieJson refMovie)
                                         {
+                                            refMovie.TranslationLanguage = TmdbClient.DefaultLanguage;
                                             refMovie.Title = movie?.Title;
                                             refMovie.Genres = movie?.Genres?.Select(a => a.Name).ToList();
                                             refMovie.DescriptionFull = movie?.Overview;
                                         }
                                         else if (movieToTranslate is MovieLightJson refMovieLight)
                                         {
+                                            refMovieLight.TranslationLanguage = TmdbClient.DefaultLanguage;
                                             refMovieLight.Title = movie?.Title;
                                             refMovieLight.Genres = movie?.Genres != null
                                                 ? string.Join(", ", movie.Genres?.Select(a => a.Name))
@@ -95,7 +100,7 @@ namespace Popcorn.Services.Movies.Movie
                                     }
                                 }).ConfigureAwait(false);
                             }
-                            catch (TimeoutRejectedException ex)
+                            catch (Exception ex)
                             {
                                 Logger.Warn(
                                     $"Movie {movieToTranslate.ImdbCode} has not been translated in {timeBeforeTimeOut} seconds. Error {ex.Message}");
@@ -132,7 +137,7 @@ namespace Popcorn.Services.Movies.Movie
         public async Task<MovieJson> GetMovieAsync(string imdbCode, CancellationToken ct)
         {
             var timeoutPolicy =
-                Policy.TimeoutAsync(5, TimeoutStrategy.Pessimistic);
+                Policy.TimeoutAsync(Utils.Constants.DefaultRequestTimeoutInSecond, TimeoutStrategy.Pessimistic);
             try
             {
                 return await timeoutPolicy.ExecuteAsync(async cancellation =>
@@ -153,6 +158,7 @@ namespace Popcorn.Services.Movies.Movie
                             throw response.ErrorException;
 
                         movie = JsonSerializer.Deserialize<MovieJson>(response.RawBytes);
+                        movie.TranslationLanguage = TmdbClient.DefaultLanguage;
                     }
                     catch (Exception exception) when (exception is TaskCanceledException)
                     {
@@ -192,7 +198,7 @@ namespace Popcorn.Services.Movies.Movie
         public async Task<MovieLightJson> GetMovieLightAsync(string imdbCode, CancellationToken ct)
         {
             var timeoutPolicy =
-                Policy.TimeoutAsync(5, TimeoutStrategy.Pessimistic);
+                Policy.TimeoutAsync(Utils.Constants.DefaultRequestTimeoutInSecond, TimeoutStrategy.Pessimistic);
             try
             {
                 return await timeoutPolicy.ExecuteAsync(async cancellation =>
@@ -213,6 +219,7 @@ namespace Popcorn.Services.Movies.Movie
                             throw response.ErrorException;
 
                         movie = JsonSerializer.Deserialize<MovieLightJson>(response.RawBytes);
+                        movie.TranslationLanguage = TmdbClient.DefaultLanguage;
                     }
                     catch (Exception exception) when (exception is TaskCanceledException)
                     {
@@ -252,7 +259,7 @@ namespace Popcorn.Services.Movies.Movie
         public async Task<IEnumerable<MovieLightJson>> GetMoviesSimilarAsync(MovieJson movie, CancellationToken ct)
         {
             var timeoutPolicy =
-                Policy.TimeoutAsync(5, TimeoutStrategy.Pessimistic);
+                Policy.TimeoutAsync(Utils.Constants.DefaultRequestTimeoutInSecond, TimeoutStrategy.Pessimistic);
             try
             {
                 return await timeoutPolicy.ExecuteAsync(async cancellation =>
@@ -289,7 +296,7 @@ namespace Popcorn.Services.Movies.Movie
             catch (Exception ex)
             {
                 Logger.Error(ex);
-                throw;
+                return new List<MovieLightJson>();
             }
         }
 
@@ -311,7 +318,7 @@ namespace Popcorn.Services.Movies.Movie
             GenreJson genre = null)
         {
             var timeoutPolicy =
-                Policy.TimeoutAsync(5, TimeoutStrategy.Pessimistic);
+                Policy.TimeoutAsync(Utils.Constants.DefaultRequestTimeoutInSecond, TimeoutStrategy.Pessimistic);
             try
             {
                 return await timeoutPolicy.ExecuteAsync(async cancellation =>
@@ -340,6 +347,10 @@ namespace Popcorn.Services.Movies.Movie
                             throw response.ErrorException;
 
                         wrapper = JsonSerializer.Deserialize<MovieLightResponse>(response.RawBytes);
+                        foreach (var movie in wrapper.Movies)
+                        {
+                            movie.TranslationLanguage = TmdbClient.DefaultLanguage;
+                        }
                     }
                     catch (Exception exception) when (exception is TaskCanceledException)
                     {
@@ -400,7 +411,7 @@ namespace Popcorn.Services.Movies.Movie
             CancellationToken ct)
         {
             var timeoutPolicy =
-                Policy.TimeoutAsync(5, TimeoutStrategy.Pessimistic);
+                Policy.TimeoutAsync(Utils.Constants.DefaultRequestTimeoutInSecond, TimeoutStrategy.Pessimistic);
             try
             {
                 return await timeoutPolicy.ExecuteAsync(async cancellation =>
@@ -428,6 +439,10 @@ namespace Popcorn.Services.Movies.Movie
                             throw response.ErrorException;
 
                         wrapper = JsonSerializer.Deserialize<MovieLightResponse>(response.RawBytes);
+                        foreach (var movie in wrapper.Movies)
+                        {
+                            movie.TranslationLanguage = TmdbClient.DefaultLanguage;
+                        }
                     }
                     catch (Exception exception) when (exception is TaskCanceledException)
                     {
@@ -457,7 +472,7 @@ namespace Popcorn.Services.Movies.Movie
             catch (Exception ex)
             {
                 Logger.Error(ex);
-                throw;
+                return (new List<MovieLightJson>(), 0);
             }
         }
 
@@ -479,7 +494,7 @@ namespace Popcorn.Services.Movies.Movie
             CancellationToken ct)
         {
             var timeoutPolicy =
-                Policy.TimeoutAsync(5, TimeoutStrategy.Pessimistic);
+                Policy.TimeoutAsync(Utils.Constants.DefaultRequestTimeoutInSecond, TimeoutStrategy.Pessimistic);
             try
             {
                 return await timeoutPolicy.ExecuteAsync(async cancellation =>
@@ -508,6 +523,10 @@ namespace Popcorn.Services.Movies.Movie
                             throw response.ErrorException;
 
                         wrapper = JsonSerializer.Deserialize<MovieLightResponse>(response.RawBytes);
+                        foreach (var movie in wrapper.Movies)
+                        {
+                            movie.TranslationLanguage = TmdbClient.DefaultLanguage;
+                        }
                     }
                     catch (Exception exception) when (exception is TaskCanceledException)
                     {
@@ -548,6 +567,7 @@ namespace Popcorn.Services.Movies.Movie
         /// <returns>Task</returns>
         public void TranslateMovie(IMovie movieToTranslate)
         {
+            if (TmdbClient.DefaultLanguage == "en" && movieToTranslate.TranslationLanguage == TmdbClient.DefaultLanguage) return;
             _moviesToTranslateObservable.OnNext(movieToTranslate);
         }
 
@@ -560,7 +580,7 @@ namespace Popcorn.Services.Movies.Movie
         public async Task<string> GetMovieTrailerAsync(MovieJson movie, CancellationToken ct)
         {
             var timeoutPolicy =
-                Policy.TimeoutAsync(5, TimeoutStrategy.Pessimistic);
+                Policy.TimeoutAsync(Utils.Constants.DefaultRequestTimeoutInSecond, TimeoutStrategy.Pessimistic);
             try
             {
                 return await timeoutPolicy.ExecuteAsync(async cancellation =>
@@ -625,6 +645,98 @@ namespace Popcorn.Services.Movies.Movie
                 Logger.Error(ex);
                 throw;
             }
+        }
+
+        /// <summary>
+        /// Get cast
+        /// </summary>
+        /// <param name="imdbCode">Tmdb cast Id</param>
+        /// <returns><see cref="Person"/></returns>
+        public async Task<Person> GetCast(string imdbCode)
+        {
+            try
+            {
+                var search = await TmdbClient.FindAsync(FindExternalSource.Imdb, $"nm{imdbCode}");
+                return await TmdbClient.GetPersonAsync(search.PersonResults.FirstOrDefault().Id, PersonMethods.Images | PersonMethods.TaggedImages);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex);
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Get movies for a cast by its ImdbCode
+        /// </summary>
+        /// <param name="imdbCode"></param>
+        /// <param name="ct"></param>
+        /// <returns></returns>
+        public async Task<IEnumerable<MovieLightJson>> GetMovieFromCast(string imdbCode, CancellationToken ct)
+        {
+            var timeoutPolicy =
+                Policy.TimeoutAsync(Utils.Constants.DefaultRequestTimeoutInSecond, TimeoutStrategy.Pessimistic);
+            try
+            {
+                return await timeoutPolicy.ExecuteAsync(async cancellation =>
+                {
+                    var watch = Stopwatch.StartNew();
+                    var wrapper = new MovieLightResponse();
+                    var restClient = new RestClient(Utils.Constants.PopcornApi);
+                    var request = new RestRequest("/movies/cast/{segment}", Method.GET);
+                    request.AddUrlSegment("segment", imdbCode);
+                    try
+                    {
+                        var response = await restClient.ExecuteTaskAsync(request, cancellation)
+                            .ConfigureAwait(false);
+                        if (response.ErrorException != null)
+                            throw response.ErrorException;
+
+                        wrapper = JsonSerializer.Deserialize<MovieLightResponse>(response.RawBytes);
+                        foreach (var movie in wrapper.Movies)
+                        {
+                            movie.TranslationLanguage = TmdbClient.DefaultLanguage;
+                        }
+                    }
+                    catch (Exception exception) when (exception is TaskCanceledException)
+                    {
+                        Logger.Debug(
+                            "GetMovieFromCast cancelled.");
+                    }
+                    catch (Exception exception)
+                    {
+                        Logger.Error(
+                            $"GetMovieFromCast: {exception.Message}");
+                        throw;
+                    }
+                    finally
+                    {
+                        watch.Stop();
+                        var elapsedMs = watch.ElapsedMilliseconds;
+                        Logger.Debug(
+                            $"GetMovieFromCast ({imdbCode}) in {elapsedMs} milliseconds.");
+                    }
+
+                    var result = wrapper?.Movies ?? new List<MovieLightJson>();
+                    ProcessTranslations(result);
+                    return result;
+                }, ct).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex);
+                return new List<MovieLightJson>();
+            }
+        }
+
+        /// <summary>
+        /// Retrieve an image url from Tmdb
+        /// </summary>
+        /// <param name="url">Image to retrieve</param>
+        /// <returns>Image url</returns>
+        public string GetImagePathFromTmdb(string url)
+        {
+            return TmdbClient.GetImageUrl("original", url, true).AbsoluteUri;
         }
     }
 }

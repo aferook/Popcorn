@@ -2,14 +2,14 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata>
         <id>Popcorn</id>
-        <version>3.0.0</version>
+        <version>3.2.0</version>
         <title>Popcorn</title>
         <authors>Benjamin Bougot</authors>
         <projectUrl>https://github.com/bbougot/Popcorn</projectUrl>
         <iconUrl>https://raw.githubusercontent.com/bbougot/Popcorn/master/Popcorn/icon.ico</iconUrl>
         <requireLicenseAcceptance>false</requireLicenseAcceptance>
         <description>A Powerful and Fast Popcorn Time Client</description>
-        <releaseNotes>Fix bugs and improve notification manager</releaseNotes>
+        <releaseNotes>Fixed issues</releaseNotes>
     </metadata>
     <files>
         <file src="en\Popcorn.resources.dll" target="lib\net45\en\Popcorn.resources.dll" />
@@ -346,8 +346,8 @@
         <file src="ltnet.dll" target="lib\net45\ltnet.dll" />
         <file src="MahApps.Metro.dll" target="lib\net45\MahApps.Metro.dll" />
         <file src="MahApps.Metro.IconPacks.dll" target="lib\net45\MahApps.Metro.IconPacks.dll" />
-        <file src="Meta.Vlc.dll" target="lib\net45\Meta.Vlc.dll" />
-        <file src="Meta.Vlc.Wpf.dll" target="lib\net45\Meta.Vlc.Wpf.dll" />
+        <file src="Popcorn.Vlc.dll" target="lib\net45\Popcorn.Vlc.dll" />
+        <file src="Popcorn.Vlc.Wpf.dll" target="lib\net45\Popcorn.Vlc.Wpf.dll" />
         <file src="Microsoft.Practices.ServiceLocation.dll" target="lib\net45\Microsoft.Practices.ServiceLocation.dll" />
         <file src="Microsoft.Win32.Primitives.dll" target="lib\net45\Microsoft.Win32.Primitives.dll" />
         <file src="Mono.Cecil.dll" target="lib\net45\Mono.Cecil.dll" />
@@ -603,7 +603,6 @@
         <file src="System.IO.FileSystem.dll" target="lib\net45\System.IO.FileSystem.dll" />
         <file src="System.IO.FileSystem.Primitives.dll" target="lib\net45\System.IO.FileSystem.Primitives.dll" />
         <file src="System.Net.Sockets.dll" target="lib\net45\System.Net.Sockets.dll" />
-        <file src="System.Reactive.dll" target="lib\net45\System.Reactive.dll" />
         <file src="System.Runtime.InteropServices.dll" target="lib\net45\System.Runtime.InteropServices.dll" />
         <file src="System.Runtime.InteropServices.RuntimeInformation.dll" target="lib\net45\System.Runtime.InteropServices.RuntimeInformation.dll" />
         <file src="System.Xml.ReaderWriter.dll" target="lib\net45\System.Xml.ReaderWriter.dll" />
@@ -715,5 +714,40 @@
         <file src="zh-Hans\Microsoft.Data.Edm.resources.dll" target="lib\net45\zh-Hans\Microsoft.Data.Edm.resources.dll" />
         <file src="zh-Hans\Microsoft.Data.OData.resources.dll" target="lib\net45\zh-Hans\Microsoft.Data.OData.resources.dll" />
         <file src="zh-Hans\System.Spatial.resources.dll" target="lib\net45\zh-Hans\System.Spatial.resources.dll" />
+        <file src="Microsoft.AspNetCore.Http.Features.dll" target="lib\net45\Microsoft.AspNetCore.Http.Features.dll" />
+        <file src="Microsoft.AspNetCore.SignalR.Client.Core.dll" target="lib\net45\Microsoft.AspNetCore.SignalR.Client.Core.dll" />
+        <file src="Microsoft.AspNetCore.SignalR.Client.dll" target="lib\net45\Microsoft.AspNetCore.SignalR.Client.dll" />
+        <file src="Microsoft.AspNetCore.SignalR.Common.dll" target="lib\net45\Microsoft.AspNetCore.SignalR.Common.dll" />
+        <file src="Microsoft.AspNetCore.Sockets.Abstractions.dll" target="lib\net45\Microsoft.AspNetCore.Sockets.Abstractions.dll" />
+        <file src="Microsoft.AspNetCore.Sockets.Client.Http.dll" target="lib\net45\Microsoft.AspNetCore.Sockets.Client.Http.dll" />
+        <file src="Microsoft.AspNetCore.Sockets.Common.Http.dll" target="lib\net45\Microsoft.AspNetCore.Sockets.Common.Http.dll" />
+        <file src="Microsoft.Extensions.Configuration.Abstractions.dll" target="lib\net45\Microsoft.Extensions.Configuration.Abstractions.dll" />
+        <file src="Microsoft.Extensions.DependencyInjection.Abstractions.dll" target="lib\net45\Microsoft.Extensions.DependencyInjection.Abstractions.dll" />
+        <file src="Microsoft.Extensions.Logging.Abstractions.dll" target="lib\net45\Microsoft.Extensions.Logging.Abstractions.dll" />
+        <file src="Microsoft.Extensions.Logging.Console.dll" target="lib\net45\Microsoft.Extensions.Logging.Console.dll" />
+        <file src="Microsoft.Extensions.Logging.dll" target="lib\net45\Microsoft.Extensions.Logging.dll" />
+        <file src="Microsoft.Extensions.Options.dll" target="lib\net45\Microsoft.Extensions.Options.dll" />
+        <file src="Microsoft.Extensions.Primitives.dll" target="lib\net45\Microsoft.Extensions.Primitives.dll" />
+        <file src="System.Binary.dll" target="lib\net45\System.Binary.dll" />
+        <file src="System.Buffers.dll" target="lib\net45\System.Buffers.dll" />
+        <file src="System.Buffers.Primitives.dll" target="lib\net45\System.Buffers.Primitives.dll" />
+        <file src="System.Collections.Sequences.dll" target="lib\net45\System.Collections.Sequences.dll" />
+        <file src="System.IO.Pipelines.dll" target="lib\net45\System.IO.Pipelines.dll" />
+        <file src="System.IO.Pipelines.Extensions.dll" target="lib\net45\System.IO.Pipelines.Extensions.dll" />
+        <file src="System.Memory.dll" target="lib\net45\System.Memory.dll" />
+        <file src="System.Numerics.Vectors.dll" target="lib\net45\System.Numerics.Vectors.dll" />
+        <file src="System.Runtime.CompilerServices.Unsafe.dll" target="lib\net45\System.Runtime.CompilerServices.Unsafe.dll" />
+        <file src="System.Threading.Tasks.Channels.dll" target="lib\net45\System.Threading.Tasks.Channels.dll" />
+        <file src="MsgPack.dll" target="lib\net45\MsgPack.dll" />
+        <file src="Microsoft.ApplicationInsights.SnapshotCollector.dll" target="lib\net45\Microsoft.ApplicationInsights.SnapshotCollector.dll" />
+        <file src="SnapshotCollectorFiles\MinidumpUploader.exe" target="lib\net45\SnapshotCollectorFiles\MinidumpUploader.exe" />
+        <file src="SnapshotCollectorFiles\MinidumpUploader.exe.config" target="lib\net45\SnapshotCollectorFiles\MinidumpUploader.exe.config" />
+        <file src="SnapshotCollectorFiles\ProductionBreakpoints_x64.dll" target="lib\net45\SnapshotCollectorFiles\ProductionBreakpoints_x64.dll" />
+        <file src="SnapshotCollectorFiles\ProductionBreakpoints_x86.dll" target="lib\net45\SnapshotCollectorFiles\ProductionBreakpoints_x86.dll" />
+        <file src="SnapshotCollectorFiles\SnapshotHolder_x64.exe" target="lib\net45\SnapshotCollectorFiles\SnapshotHolder_x64.exe" />
+        <file src="SnapshotCollectorFiles\SnapshotHolder_x86.exe" target="lib\net45\SnapshotCollectorFiles\SnapshotHolder_x86.exe" />
+        <file src="Microsoft.WindowsAPICodePack.dll" target="lib\net45\Microsoft.WindowsAPICodePack.dll" />
+        <file src="Microsoft.WindowsAPICodePack.Shell.dll" target="lib\net45\Microsoft.WindowsAPICodePack.Shell.dll" />
+        <file src="Microsoft.WindowsAPICodePack.ShellExtensions.dll" target="lib\net45\Microsoft.WindowsAPICodePack.ShellExtensions.dll" />
     </files>
 </package>

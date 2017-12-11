@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -28,7 +29,7 @@ namespace Popcorn.Windows
         {
             Initialized += OnInitialized;
             InitializeComponent();
-            Closing += OnClosing;
+            Application.Current.Exit += OnExit;
             var vm = DataContext as WindowViewModel;
             if (vm != null)
             {
@@ -75,16 +76,16 @@ namespace Popcorn.Windows
             });
         }
 
+        private void OnExit(object sender, ExitEventArgs e)
+        {
+            _listener.UnHookKeyboard();
+        }
+
         private void OnInitialized(object sender, EventArgs e)
         {
             _listener = new LowLevelKeyboardListener();
             _listener.OnKeyPressed += OnKeyPressed;
             _listener.HookKeyboard();
-        }
-
-        private void OnClosing(object sender, System.ComponentModel.CancelEventArgs e)
-        {
-            _listener.UnHookKeyboard();
         }
 
         private void OnKeyPressed(object sender, KeyPressedArgs e)

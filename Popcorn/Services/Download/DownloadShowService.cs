@@ -3,6 +3,7 @@ using Popcorn.Messaging;
 using Popcorn.Models.Episode;
 using System;
 using Popcorn.Models.Bandwidth;
+using Popcorn.Models.Download;
 using Popcorn.Models.Media;
 using Popcorn.Services.Cache;
 
@@ -24,9 +25,11 @@ namespace Popcorn.Services.Download
         /// <param name="media"><see cref="IMediaFile"/></param>
         /// <param name="reportDownloadProgress">Download progress</param>
         /// <param name="reportBandwidthRate">The bandwidth rate</param>
-        protected override void BroadcastMediaBuffered(T media, Progress<double> reportDownloadProgress, Progress<BandwidthRate> reportBandwidthRate)
+        /// <param name="playingProgress">The playing progress</param>
+        /// <param name="pieceAvailability">The piece availability</param>
+        protected override void BroadcastMediaBuffered(T media, Progress<double> reportDownloadProgress, Progress<BandwidthRate> reportBandwidthRate, IProgress<double> playingProgress, Progress<PieceAvailability> pieceAvailability)
         {
-            Messenger.Default.Send(new PlayShowEpisodeMessage(media, reportDownloadProgress, reportBandwidthRate));
+            Messenger.Default.Send(new PlayShowEpisodeMessage(media, reportDownloadProgress, reportBandwidthRate, playingProgress, pieceAvailability));
         }
     }
 }

@@ -292,7 +292,7 @@ namespace Popcorn.ViewModels.Pages.Home.Movie.Details
         /// <summary>
         /// Command used to browse Imdb
         /// </summary>
-        public ICommand GoToImdbCommand { get; private set; }
+        public ICommand GoToTmdbCommand { get; private set; }
 
         /// <summary>
         /// Command used to play the trailer
@@ -459,9 +459,9 @@ namespace Popcorn.ViewModels.Pages.Home.Movie.Details
         {
             LoadMovieCommand = new RelayCommand<IMovie>(async movie =>
                 await LoadMovie(movie, CancellationLoadingToken.Token).ConfigureAwait(false));
-            GoToImdbCommand = new RelayCommand<string>(e =>
+            GoToTmdbCommand = new RelayCommand<string>(e =>
             {
-                Process.Start($"http://www.imdb.com/title/{e}");
+                Process.Start($"https://www.themoviedb.org/movie/{e}");
             });
 
             PlayMovieCommand = new RelayCommand(() =>
@@ -489,15 +489,17 @@ namespace Popcorn.ViewModels.Pages.Home.Movie.Details
             });
 
             SetFavoriteMovieCommand =
-                new RelayCommand<MovieJson>(movie =>
+                new RelayCommand<bool>(isFavorite =>
                 {
-                    _userService.SetMovie(movie);
+                    Movie.IsFavorite = isFavorite;
+                    _userService.SetMovie(Movie);
                     Messenger.Default.Send(new ChangeFavoriteMovieMessage());
                 });
 
-            SetWatchedMovieCommand = new RelayCommand<MovieJson>(movie =>
+            SetWatchedMovieCommand = new RelayCommand<bool>(hasBeenSeen =>
             {
-                _userService.SetMovie(movie);
+                Movie.HasBeenSeen = hasBeenSeen;
+                _userService.SetMovie(Movie);
                 Messenger.Default.Send(new ChangeSeenMovieMessage());
             });
         }
@@ -524,7 +526,7 @@ namespace Popcorn.ViewModels.Pages.Home.Movie.Details
                     _userService.SyncMovieHistory(new List<IMovie> { Movie });
                     IsMovieLoading = false;
                     Movie.FullHdAvailable = Movie.Torrents.Count != 1;
-                    Movie.WatchInFullHdQuality = (Movie.FullHdAvailable && Movie.Torrents.Count == 1) || (Movie.FullHdAvailable && applicationSettings.DefaultHdQuality);
+                    Movie.WatchInFullHdQuality = Movie.FullHdAvailable && Movie.Torrents.Count == 1 || Movie.FullHdAvailable && applicationSettings.DefaultHdQuality;
                     ComputeTorrentHealth();
                     var tasks = new Func<Task>[]
                     {

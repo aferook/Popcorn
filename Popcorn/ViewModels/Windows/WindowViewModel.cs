@@ -1,27 +1,21 @@
 ﻿using System;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
-using System.Reflection;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Navigation;
 using Akavache;
-using CefSharp;
 using Enterwell.Clients.Wpf.Notifications;
 using GalaSoft.MvvmLight;
 using GalaSoft.MvvmLight.CommandWpf;
 using GalaSoft.MvvmLight.Ioc;
 using GalaSoft.MvvmLight.Messaging;
 using GalaSoft.MvvmLight.Threading;
-using Ignite.SharpNetSH;
 using MahApps.Metro.Controls.Dialogs;
-using Microsoft.Owin.Hosting;
 using Microsoft.Win32;
-using NetFwTypeLib;
 using NLog;
 using Polly.Timeout;
 using Popcorn.Dialogs;
@@ -30,8 +24,7 @@ using Popcorn.Helpers;
 using Popcorn.Messaging;
 using Popcorn.Services.Application;
 using Popcorn.Services.Cache;
-using Popcorn.Services.Hub;
-using Popcorn.Services.Server;
+using Popcorn.Services.Chromecast;
 using Popcorn.Services.User;
 using Popcorn.Utils;
 using Popcorn.Utils.Exceptions;
@@ -42,8 +35,6 @@ using Popcorn.ViewModels.Pages.Home.Show;
 using Popcorn.ViewModels.Pages.Player;
 using Popcorn.ViewModels.Windows.Settings;
 using Popcorn.Services.Subtitles;
-using Popcorn.Services.Trakt;
-using Popcorn.Vlc.Wpf;
 
 namespace Popcorn.ViewModels.Windows
 {
@@ -66,16 +57,6 @@ namespace Popcorn.ViewModels.Windows
         /// Holds the async message relative to <see cref="ShowSubtitleDialogMessage"/>
         /// </summary>
         private IDisposable _showSubtitleDialogMessage;
-
-        /// <summary>
-        /// Holds the async message relative to <see cref="ShowTraktDialogMessage"/>
-        /// </summary>
-        private IDisposable _showTraktDialogMessage;
-
-        /// <summary>
-        /// The disposable local OWIN server
-        /// </summary>
-        private IDisposable _localServer;
 
         /// <summary>
         /// Holds the async message relative to <see cref="CastMediaMessage"/>
@@ -128,14 +109,9 @@ namespace Popcorn.ViewModels.Windows
         private readonly IUserService _userService;
 
         /// <summary>
-        /// The Trakt service
+        /// The chromecast service
         /// </summary>
-        private readonly ITraktService _traktService;
-
-        /// <summary>
-        /// The popcorn hub service
-        /// </summary>
-        private readonly IPopcornHubService _popcornHubService;
+        private readonly IChromecastService _chromecastService;
 
         /// <summary>
         /// <see cref="MediaPlayer"/>
@@ -158,11 +134,6 @@ namespace Popcorn.ViewModels.Windows
         private readonly NotificationMessageManager _manager;
 
         /// <summary>
-        /// If initialized
-        /// </summary>
-        private bool _initialized;
-
-        /// <summary>
         /// The cache service
         /// </summary>
         private readonly ICacheService _cacheService;
@@ -173,17 +144,15 @@ namespace Popcorn.ViewModels.Windows
         /// <param name="applicationService">Instance of Application state</param>
         /// <param name="userService">Instance of movie history service</param>
         /// <param name="subtitlesService">Instance of subtitles service</param>
-        /// <param name="traktService">Instance of Trakt service</param>
-        /// <param name="popcornHubService">Instance of Popcorn Hub service</param>
+        /// <param name="chromecastService">Instance of Chromecast service</param>
         /// <param name="cacheService">Instance of cache service</param>
         /// <param name="manager">The notification manager</param>
         public WindowViewModel(IApplicationService applicationService, IUserService userService,
-            ISubtitlesService subtitlesService, ITraktService traktService, IPopcornHubService popcornHubService,
+            ISubtitlesService subtitlesService, IChromecastService chromecastService,
             ICacheService cacheService, NotificationMessageManager manager)
         {
+            _chromecastService = chromecastService;
             _cacheService = cacheService;
-            _popcornHubService = popcornHubService;
-            _traktService = traktService;
             _manager = manager;
             _subtitlesService = subtitlesService;
             _userService = userService;
@@ -296,8 +265,6 @@ namespace Popcorn.ViewModels.Windows
         /// </summary>
         public ICommand OpenHelpCommand { get; private set; }
 
-        public ICommand OpenWelcomeCommand { get; private set; }
-
         /// <summary>
         /// Command used to load tabs
         /// </summary>
@@ -336,7 +303,7 @@ namespace Popcorn.ViewModels.Windows
             Messenger.Default.Register<PlayShowEpisodeMessage>(this, message => DispatcherHelper.CheckBeginInvokeOnUI(
                 async () =>
                 {
-                    MediaPlayer = new MediaPlayerViewModel(_subtitlesService, _cacheService,
+                    MediaPlayer = new MediaPlayerViewModel(_chromecastService, _subtitlesService, _cacheService,
                         message.Episode.FilePath,
                         message.Episode.Title,
                         MediaType.Show,
@@ -348,7 +315,9 @@ namespace Popcorn.ViewModels.Windows
                         {
                             Messenger.Default.Send(new StopPlayingEpisodeMessage());
                         },
+                        message.PlayingProgress,
                         message.BufferProgress,
+                        message.PieceAvailability,
                         message.BandwidthRate,
                         message.Episode.SelectedSubtitle,
                         message.Episode.AvailableSubtitles);
@@ -372,7 +341,7 @@ namespace Popcorn.ViewModels.Windows
             Messenger.Default.Register<PlayMediaMessage>(this, message => DispatcherHelper.CheckBeginInvokeOnUI(
                 async () =>
                 {
-                    MediaPlayer = new MediaPlayerViewModel(_subtitlesService, _cacheService,
+                    MediaPlayer = new MediaPlayerViewModel(_chromecastService, _subtitlesService, _cacheService,
                         message.MediaPath,
                         message.MediaPath,
                         MediaType.Unkown,
@@ -384,7 +353,9 @@ namespace Popcorn.ViewModels.Windows
                         {
                             Messenger.Default.Send(new StopPlayMediaMessage());
                         },
+                        message.PlayingProgress,
                         message.BufferProgress,
+                        message.PieceAvailability,
                         message.BandwidthRate);
 
                     ApplicationService.IsMediaPlaying = true;
@@ -407,7 +378,7 @@ namespace Popcorn.ViewModels.Windows
             Messenger.Default.Register<PlayMovieMessage>(this, message => DispatcherHelper.CheckBeginInvokeOnUI(
                 async () =>
                 {
-                    MediaPlayer = new MediaPlayerViewModel(_subtitlesService, _cacheService,
+                    MediaPlayer = new MediaPlayerViewModel(_chromecastService, _subtitlesService, _cacheService,
                         message.Movie.FilePath, message.Movie.Title,
                         MediaType.Movie,
                         () =>
@@ -420,7 +391,9 @@ namespace Popcorn.ViewModels.Windows
                             Messenger.Default.Send(new ChangeSeenMovieMessage());
                             Messenger.Default.Send(new StopPlayingMovieMessage());
                         },
+                        message.PlayingProgress,
                         message.BufferProgress,
+                        message.PieceAvailability,
                         message.BandwidthRate,
                         message.Movie.SelectedSubtitle,
                         message.Movie.AvailableSubtitles);
@@ -444,7 +417,7 @@ namespace Popcorn.ViewModels.Windows
             Messenger.Default.Register<PlayTrailerMessage>(this, message => DispatcherHelper.CheckBeginInvokeOnUI(
                 async () =>
                 {
-                    MediaPlayer = new MediaPlayerViewModel(_subtitlesService, _cacheService,
+                    MediaPlayer = new MediaPlayerViewModel(_chromecastService, _subtitlesService, _cacheService,
                         message.TrailerUrl,
                         message.MovieTitle,
                         MediaType.Trailer,
@@ -568,7 +541,7 @@ namespace Popcorn.ViewModels.Windows
 
             _castMediaMessage = Messenger.Default.RegisterAsyncMessage<CastMediaMessage>(async message =>
             {
-                var vm = new ChromecastDialogViewModel(message);
+                var vm = new ChromecastDialogViewModel(message, _chromecastService);
                 var castDialog = new CastDialog
                 {
                     DataContext = vm
@@ -583,12 +556,19 @@ namespace Popcorn.ViewModels.Windows
                     }
                     catch (Exception ex)
                     {
-                        Logger.Error(ex);
                         cts.TrySetException(ex);
                     }
                 };
-                await _dialogCoordinator.ShowMetroDialogAsync(this, castDialog);
-                await cts.Task;
+
+                try
+                {
+                    await _dialogCoordinator.ShowMetroDialogAsync(this, castDialog);
+                    await cts.Task;
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex);
+                }
             });
 
             _showSubtitleDialogMessage = Messenger.Default.RegisterAsyncMessage<ShowSubtitleDialogMessage>(
@@ -611,41 +591,20 @@ namespace Popcorn.ViewModels.Windows
                         }
                         catch (Exception ex)
                         {
-                            Logger.Error(ex);
                             cts.TrySetException(ex);
                         }
                     };
-                    await _dialogCoordinator.ShowMetroDialogAsync(this, subtitleDialog);
-                    await cts.Task;
-                });
 
-            _showTraktDialogMessage = Messenger.Default.RegisterAsyncMessage<ShowTraktDialogMessage>(async message =>
-            {
-                var vm = new TraktDialogViewModel(_traktService);
-                var subtitleDialog = new TraktDialog
-                {
-                    DataContext = vm
-                };
-
-                var cts = new TaskCompletionSource<object>();
-                vm.CloseAction = async () =>
-                {
                     try
                     {
-                        message.IsLoggedIn = vm.IsLoggedIn;
-                        await _dialogCoordinator.HideMetroDialogAsync(this, subtitleDialog);
-                        cts.TrySetResult(null);
+                        await _dialogCoordinator.ShowMetroDialogAsync(this, subtitleDialog);
+                        await cts.Task;
                     }
                     catch (Exception ex)
                     {
                         Logger.Error(ex);
-                        cts.TrySetException(ex);
                     }
-                };
-                IsSettingsFlyoutOpen = false;
-                await _dialogCoordinator.ShowMetroDialogAsync(this, subtitleDialog);
-                await cts.Task;
-            });
+                });
 
             _customSubtitleMessage = Messenger.Default.RegisterAsyncMessage<CustomSubtitleMessage>(
                 async message =>
@@ -704,11 +663,8 @@ namespace Popcorn.ViewModels.Windows
                 try
                 {
                     await _userService.UpdateUser();
-                    _localServer?.Dispose();
                     await SaveCacheOnExit();
-                    Cef.Shutdown();
                     FileHelper.ClearFolders();
-                    ApiManager.ReleaseAll();
                 }
                 catch (Exception ex)
                 {
@@ -741,10 +697,24 @@ namespace Popcorn.ViewModels.Windows
                                 await vm.Download(settings.UploadLimit, settings.DownloadLimit,
                                     async () =>
                                     {
-                                        await _dialogCoordinator.HideMetroDialogAsync(this, dropTorrentDialog);
+                                        try
+                                        {
+                                            await _dialogCoordinator.HideMetroDialogAsync(this, dropTorrentDialog);
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            Logger.Error(ex);
+                                        }
                                     }, async () =>
                                     {
-                                        await _dialogCoordinator.HideMetroDialogAsync(this, dropTorrentDialog);
+                                        try
+                                        {
+                                            await _dialogCoordinator.HideMetroDialogAsync(this, dropTorrentDialog);
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            Logger.Error(ex);
+                                        }
                                     });
                             });
                         }
@@ -756,7 +726,8 @@ namespace Popcorn.ViewModels.Windows
                         Messenger.Default.Send(new DropFileMessage(DropFileMessage.DropFileEvent.Leave));
                         Messenger.Default.Send(
                             new UnhandledExceptionMessage(
-                                new NoDataInDroppedFileException(LocalizationProviderHelper.GetLocalizedValue<string>("NoMediaInDroppedTorrent"))));
+                                new NoDataInDroppedFileException(
+                                    LocalizationProviderHelper.GetLocalizedValue<string>("NoMediaInDroppedTorrent"))));
                     }
                 }
                 catch (Exception)
@@ -764,7 +735,8 @@ namespace Popcorn.ViewModels.Windows
                     Messenger.Default.Send(new DropFileMessage(DropFileMessage.DropFileEvent.Leave));
                     Messenger.Default.Send(
                         new UnhandledExceptionMessage(
-                            new PopcornException(LocalizationProviderHelper.GetLocalizedValue<string>("DroppedFileIssue"))));
+                            new PopcornException(
+                                LocalizationProviderHelper.GetLocalizedValue<string>("DroppedFileIssue"))));
                 }
             });
 
@@ -773,7 +745,14 @@ namespace Popcorn.ViewModels.Windows
                 var aboutDialog = new AboutDialog();
                 var vm = new AboutDialogViewModel(async () =>
                 {
-                    await _dialogCoordinator.HideMetroDialogAsync(this, aboutDialog);
+                    try
+                    {
+                        await _dialogCoordinator.HideMetroDialogAsync(this, aboutDialog);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Error(ex);
+                    }
                 });
 
                 aboutDialog.DataContext = vm;
@@ -785,7 +764,14 @@ namespace Popcorn.ViewModels.Windows
                 var helpDialog = new HelpDialog();
                 var vm = new HelpDialogViewModel(async () =>
                 {
-                    await _dialogCoordinator.HideMetroDialogAsync(this, helpDialog);
+                    try
+                    {
+                        await _dialogCoordinator.HideMetroDialogAsync(this, helpDialog);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Error(ex);
+                    }
                 });
 
                 helpDialog.DataContext = vm;
@@ -802,24 +788,12 @@ namespace Popcorn.ViewModels.Windows
                 Messenger.Default.Send(new DropFileMessage(DropFileMessage.DropFileEvent.Leave));
             });
 
-            OpenWelcomeCommand = new RelayCommand(async () =>
-            {
-                var welcomeDialog = new WelcomeDialog();
-                var vm = new WelcomeDialogViewModel(async () =>
-                {
-                    await _dialogCoordinator.HideMetroDialogAsync(this, welcomeDialog);
-                });
-
-                welcomeDialog.DataContext = vm;
-                await _dialogCoordinator.ShowMetroDialogAsync(this, welcomeDialog);
-            });
-
             InitializeAsyncCommand = new RelayCommand(async () =>
             {
                 var cmd = Environment.GetCommandLineArgs();
                 if (cmd.Any())
                 {
-                    if (cmd.Contains("restart"))
+                    if (cmd.Contains("updated"))
                     {
                         OpenAboutCommand.Execute(null);
                     }
@@ -828,63 +802,6 @@ namespace Popcorn.ViewModels.Windows
                         var path = cmd[1];
                         await HandleTorrentDownload(path);
                     }
-                }
-
-                try
-                {
-                    var netsh = new NetSH(new Utils.CommandLineHarness());
-                    var showResponse = netsh.Http.Show.UrlAcl(Constants.ServerUrl);
-                    if (showResponse.ResponseObject.Count == 0 || !FirewallRuleExists("Popcorn Server"))
-                    {
-                        var arguments = string.Empty;
-                        if (showResponse.ResponseObject.Count == 0)
-                            arguments += "acl ";
-
-                        if (!FirewallRuleExists("Popcorn Server"))
-                            arguments += "fw";
-
-                        var handlerPath = $@"{
-                                Directory.GetParent(new Uri(Assembly.GetExecutingAssembly().CodeBase)
-                                    .AbsolutePath)
-                            }\Popcorn.Handler";
-                        if (File.Exists(handlerPath))
-                        {
-                            File.Move(handlerPath, handlerPath + ".exe");
-                        }
-
-                        var process = new Process();
-                        var startInfo =
-                            new ProcessStartInfo
-                            {
-                                FileName = handlerPath + ".exe",
-                                Arguments = $"{arguments}",
-                                Verb = "runas"
-                            };
-                        process.StartInfo = startInfo;
-                        process.EnableRaisingEvents = true;
-                        process.Start();
-                        process.Exited += (sender, args) =>
-                        {
-                            try
-                            {
-                                _localServer = WebApp.Start<Startup>(Constants.ServerUrl);
-                            }
-                            catch (Exception ex)
-                            {
-                                Logger.Error(ex);
-                            }
-                        };
-                    }
-                    else
-                    {
-                        _localServer = WebApp.Start<Startup>(Constants.ServerUrl);
-                    }
-
-                    await _popcornHubService.Start();
-                }
-                catch (Exception ex)
-                {
-                    Logger.Error(ex);
                 }
             });
         }
@@ -929,28 +846,6 @@ namespace Popcorn.ViewModels.Windows
             }
         }
 
-        private bool FirewallRuleExists(string ruleName)
-        {
-            try
-            {
-                Type tNetFwPolicy2 = Type.GetTypeFromProgID("HNetCfg.FwPolicy2");
-                INetFwPolicy2 fwPolicy2 = (INetFwPolicy2) Activator.CreateInstance(tNetFwPolicy2);
-                foreach (INetFwRule rule in fwPolicy2.Rules)
-                {
-                    if (rule.Name.IndexOf(ruleName, StringComparison.Ordinal) != -1)
-                    {
-                        return true;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex);
-            }
-
-            return false;
-        }
-
         /// <summary>
         /// Flush cache on disk
         /// </summary>
@@ -969,8 +864,6 @@ namespace Popcorn.ViewModels.Windows
             if (e.ExceptionObject is Exception ex)
             {
                 Logger.Fatal(ex);
-                ManageException(
-                    new PopcornException(LocalizationProviderHelper.GetLocalizedValue<string>("FatalError")));
             }
         }
 
@@ -989,7 +882,6 @@ namespace Popcorn.ViewModels.Windows
                         .Accent("#E82C0C")
                         .Background("#333")
                         .HasBadge("Error")
-                        .HasMessage(LocalizationProviderHelper.GetLocalizedValue<string>("EmbarrassingError"))
                         .HasMessage(
                             LocalizationProviderHelper.GetLocalizedValue<string>("ConnectionErrorDescriptionPopup"))
                         .Dismiss().WithButton(LocalizationProviderHelper.GetLocalizedValue<string>("Ignore"),
@@ -1015,6 +907,17 @@ namespace Popcorn.ViewModels.Windows
                         .HasBadge("Warning")
                         .HasMessage(exception.Message)
                         .Dismiss().WithButton(LocalizationProviderHelper.GetLocalizedValue<string>("Dismiss"),
+                            button => { })
+                        .Queue();
+                }
+                else if (exception is PopcornException)
+                {
+                    _manager.CreateMessage()
+                        .Accent("#E82C0C")
+                        .Background("#333")
+                        .HasBadge("Error")
+                        .HasMessage(exception.Message)
+                        .Dismiss().WithButton(LocalizationProviderHelper.GetLocalizedValue<string>("Ignore"),
                             button => { })
                         .Queue();
                 }

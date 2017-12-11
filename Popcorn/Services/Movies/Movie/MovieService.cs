@@ -21,7 +21,6 @@ using Polly;
 using Polly.Timeout;
 using Popcorn.Extensions;
 using TMDbLib.Objects.Find;
-using TMDbLib.Objects.General;
 using TMDbLib.Objects.People;
 using Utf8Json;
 
@@ -61,9 +60,8 @@ namespace Popcorn.Services.Movies.Movie
                     _moviesToTranslateObservable.Drain(s => Observable.Return(s).Delay(TimeSpan.FromMilliseconds(250)))
                         .Subscribe(async movieToTranslate =>
                         {
-                            var timeBeforeTimeOut = 3;
                             var timeoutPolicy =
-                                Policy.TimeoutAsync(timeBeforeTimeOut, TimeoutStrategy.Pessimistic);
+                                Policy.TimeoutAsync(Utils.Constants.DefaultRequestTimeoutInSecond, TimeoutStrategy.Pessimistic);
                             try
                             {
                                 await timeoutPolicy.ExecuteAsync(async () =>
@@ -103,7 +101,7 @@ namespace Popcorn.Services.Movies.Movie
                             catch (Exception ex)
                             {
                                 Logger.Warn(
-                                    $"Movie {movieToTranslate.ImdbCode} has not been translated in {timeBeforeTimeOut} seconds. Error {ex.Message}");
+                                    $"Movie {movieToTranslate.ImdbCode} has not been translated in {Utils.Constants.DefaultRequestTimeoutInSecond} seconds. Error {ex.Message}");
                             }
                         });
                 }
@@ -159,6 +157,7 @@ namespace Popcorn.Services.Movies.Movie
 
                         movie = JsonSerializer.Deserialize<MovieJson>(response.RawBytes);
                         movie.TranslationLanguage = TmdbClient.DefaultLanguage;
+                        movie.TmdbId = (await TmdbClient.GetMovieAsync(movie.ImdbCode).ConfigureAwait(false)).Id;
                     }
                     catch (Exception exception) when (exception is TaskCanceledException)
                     {
@@ -270,7 +269,7 @@ namespace Popcorn.Services.Movies.Movie
                     {
                         if (movie.Similars != null && movie.Similars.Any())
                         {
-                            similarMovies = await GetSimilarAsync(0, Utils.Constants.MaxMoviesPerPage, movie.Similars,
+                            similarMovies = await GetSimilarAsync(movie.Similars,
                                     CancellationToken.None)
                                 .ConfigureAwait(false);
                         }
@@ -400,14 +399,10 @@ namespace Popcorn.Services.Movies.Movie
         /// <summary>
         /// Get similar movies
         /// </summary>
-        /// <param name="page">Page to return</param>
-        /// <param name="limit">The maximum number of movies to return</param>
         /// <param name="imdbIds">The imdbIds of the movies, split by comma</param>
         /// <param name="ct">Cancellation token</param>
         /// <returns>Similar movies</returns>
-        public async Task<(IEnumerable<MovieLightJson> movies, int nbMovies)> GetSimilarAsync(int page,
-            int limit,
-            IEnumerable<string> imdbIds,
+        public async Task<(IEnumerable<MovieLightJson> movies, int nbMovies)> GetSimilarAsync(IEnumerable<string> imdbIds,
             CancellationToken ct)
         {
             var timeoutPolicy =
@@ -418,18 +413,10 @@ namespace Popcorn.Services.Movies.Movie
                 {
                     var watch = Stopwatch.StartNew();
                     var wrapper = new MovieLightResponse();
-                    if (limit < 1 || limit > 50)
-                        limit = Utils.Constants.MaxMoviesPerPage;
-
-                    if (page < 1)
-                        page = 1;
-
                     var restClient = new RestClient(Utils.Constants.PopcornApi);
                     var request = new RestRequest("/{segment}/{subsegment}", Method.POST);
                     request.AddUrlSegment("segment", "movies");
-                    request.AddUrlSegment("subsegment", "similar");
-                    request.AddQueryParameter("limit", limit.ToString());
-                    request.AddQueryParameter("page", page.ToString());
+                    request.AddUrlSegment("subsegment", "ids");
                     request.AddJsonBody(imdbIds);
 
                     try
@@ -460,7 +447,7 @@ namespace Popcorn.Services.Movies.Movie
                         watch.Stop();
                         var elapsedMs = watch.ElapsedMilliseconds;
                         Logger.Debug(
-                            $"GetSimilarAsync ({page}, {limit}, {string.Join(",", imdbIds)}) in {elapsedMs} milliseconds.");
+                            $"GetSimilarAsync ({string.Join(",", imdbIds)}) in {elapsedMs} milliseconds.");
                     }
 
                     var result = wrapper?.Movies ?? new List<MovieLightJson>();
@@ -567,7 +554,8 @@ namespace Popcorn.Services.Movies.Movie
         /// <returns>Task</returns>
         public void TranslateMovie(IMovie movieToTranslate)
         {
-            if (TmdbClient.DefaultLanguage == "en" && movieToTranslate.TranslationLanguage == TmdbClient.DefaultLanguage) return;
+            if (TmdbClient.DefaultLanguage == "en" &&
+                movieToTranslate.TranslationLanguage == TmdbClient.DefaultLanguage) return;
             _moviesToTranslateObservable.OnNext(movieToTranslate);
         }
 
@@ -594,24 +582,11 @@ namespace Popcorn.Services.Movies.Movie
                         var trailers = tmdbMovie?.Videos;
                         if (trailers != null && trailers.Results.Any())
                         {
-                            using (var service = Client.For(YouTube.Default))
-                            {
-                                var videos =
-                                    (await service.GetAllVideosAsync("https://youtube.com/watch?v=" + trailers.Results
-                                                                         .FirstOrDefault()
-                                                                         .Key).ConfigureAwait(false))
-                                    .ToList();
-                                if (videos.Any())
-                                {
-                                    var settings = SimpleIoc.Default.GetInstance<ApplicationSettingsViewModel>();
-                                    var maxRes = settings.DefaultHdQuality ? 1080 : 720;
-                                    uri =
-                                        await videos.Where(a => !a.Is3D && a.Resolution <= maxRes &&
-                                                                a.Format == VideoFormat.Mp4 && a.AudioBitrate > 0)
-                                            .Aggregate((i1, i2) => i1.Resolution > i2.Resolution ? i1 : i2)
-                                            .GetUriAsync();
-                                }
-                            }
+                            var trailer = trailers.Results
+                                .FirstOrDefault()
+                                .Key;
+                            var video = await GetVideoFromYtVideoId(trailer);
+                            uri = await video.GetUriAsync();
                         }
                         else
                         {
@@ -647,6 +622,27 @@ namespace Popcorn.Services.Movies.Movie
             }
         }
 
+        public async Task<YouTubeVideo> GetVideoFromYtVideoId(string ytVideoId)
+        {
+            using (var service = Client.For(YouTube.Default))
+            {
+                var videos =
+                    (await service.GetAllVideosAsync($"https://youtube.com/watch?v={ytVideoId}").ConfigureAwait(false))
+                    .ToList();
+                if (videos.Any())
+                {
+                    var settings = SimpleIoc.Default.GetInstance<ApplicationSettingsViewModel>();
+                    var maxRes = settings.DefaultHdQuality ? 1080 : 720;
+                    return
+                        videos.Where(a => !a.Is3D && a.Resolution <= maxRes &&
+                                          a.Format == VideoFormat.Mp4 && a.AudioBitrate > 0)
+                            .Aggregate((i1, i2) => i1.Resolution > i2.Resolution ? i1 : i2);
+                }
+
+                return null;
+            }
+        }
+
         /// <summary>
         /// Get cast
         /// </summary>
@@ -657,7 +653,8 @@ namespace Popcorn.Services.Movies.Movie
             try
             {
                 var search = await TmdbClient.FindAsync(FindExternalSource.Imdb, $"nm{imdbCode}");
-                return await TmdbClient.GetPersonAsync(search.PersonResults.FirstOrDefault().Id, PersonMethods.Images | PersonMethods.TaggedImages);
+                return await TmdbClient.GetPersonAsync(search.PersonResults.FirstOrDefault().Id,
+                    PersonMethods.Images | PersonMethods.TaggedImages);
             }
             catch (Exception ex)
             {

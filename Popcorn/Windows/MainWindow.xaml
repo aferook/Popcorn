@@ -16,6 +16,7 @@
     xmlns:lex="http://wpflocalizeextension.codeplex.com"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:settings="clr-namespace:Popcorn.UserControls.Window.Settings"
+    xmlns:tb="http://www.hardcodet.net/taskbar"
     xmlns:windows="clr-namespace:Popcorn.ViewModels.Windows"
     Title="Popcorn"
     Width="{Binding Source={x:Static SystemParameters.PrimaryScreenWidth}, Converter={converters:RatioConverter}, ConverterParameter='0.8'}"
@@ -46,7 +47,6 @@
     <Window.Resources>
         <ResourceDictionary>
             <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
-
             <Style TargetType="{x:Type controls:WindowButtonCommands}">
                 <Setter Property="Foreground" Value="White" />
                 <Style.Triggers>
@@ -108,6 +108,7 @@
                 Width="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType=controls:MetroWindow}, Path=ActualWidth, Mode=OneWay}"
                 Margin="0.01,0,0,0"
                 AnimateOpacity="True"
+                CloseButtonVisibility="{Binding ShowDetails.DownloadShow.IsDownloadingEpisode, Converter={StaticResource BoolToVisibilityConverter}, Source={StaticResource Locator}}"
                 CloseCommand="{Binding CloseShowPageCommand}"
                 Header="{Binding ShowDetails.Show.Title, Source={StaticResource Locator}}"
                 HeaderTemplate="{Binding Source={StaticResource FlyoutHeaderTemplate}}"
@@ -135,12 +136,13 @@
                 HeaderTemplate="{Binding Source={StaticResource FlyoutHeaderTemplate}}"
                 IsOpen="{Binding IsCastFlyoutOpen}"
                 Position="Right">
-                <cast:CastUserControl x:Name="CastUc" />
+                <cast:CastUserControl />
             </controls:Flyout>
             <controls:Flyout
                 Header="{lex:LocText SettingsMenuTitle}"
                 IsModal="True"
                 IsOpen="{Binding IsSettingsFlyoutOpen}"
+                IsPinned="False"
                 Opacity="0.9"
                 Position="Right"
                 Theme="Dark">

@@ -31,6 +31,11 @@
                 <Setter Property="TitleFontSize" Value="14" />
             </Style>
 
+            <iconPacks:PackIconMaterialKind x:Key="AccountCircle">
+                AccountCircle
+            </iconPacks:PackIconMaterialKind>
+
+            <converters:PackIconMaterialImageSourceConverter x:Key="PackIconMaterialImageSourceConverter" />
             <converters:ValueToBrushConverter x:Key="ValueToBrushConverter" />
             <converters:MultiBooleanToBoolConverter x:Key="MultiBooleanToBoolConverter" />
             <converters:BoolToInverseVisibilityConverter x:Key="BoolToInverseVisibilityConverter" />
@@ -153,8 +158,8 @@
             <Image
                 Grid.Row="0"
                 Grid.RowSpan="3"
-                attachedProperties:ImageAsyncHelper.ImagePath="{Binding Movie.BackdropImage}"
-                attachedProperties:ImageAsyncHelper.Type="Backdrop"
+                attachedProperties:ImageAsyncHelper.ImagePath="{Binding Movie.BackgroundImage}"
+                attachedProperties:ImageAsyncHelper.Type="Background"
                 Opacity="0.3" />
             <TextBlock
                 Grid.Row="0"
@@ -233,7 +238,7 @@
                                         Height="50"
                                         VerticalAlignment="Center"
                                         Command="{Binding SetWatchedMovieCommand}"
-                                        CommandParameter="{Binding Movie}"
+                                        CommandParameter="{Binding Movie.HasBeenSeen}"
                                         IsChecked="{Binding Movie.HasBeenSeen}"
                                         Style="{StaticResource MetroCircleToggleButtonStyle}">
                                         <iconPacks:PackIconFontAwesome
@@ -250,7 +255,7 @@
                                         Margin="5,0,0,0"
                                         VerticalAlignment="Center"
                                         Command="{Binding SetFavoriteMovieCommand}"
-                                        CommandParameter="{Binding Movie}"
+                                        CommandParameter="{Binding Movie.IsFavorite}"
                                         IsChecked="{Binding Movie.IsFavorite}"
                                         Style="{StaticResource MetroCircleToggleButtonStyle}">
                                         <Rectangle
@@ -426,9 +431,9 @@
                                         Margin="0,0,10,0"
                                         VerticalAlignment="Center"
                                         controls:ControlsHelper.ContentCharacterCasing="Normal"
-                                        Command="{Binding GoToImdbCommand}"
-                                        CommandParameter="{Binding Movie.ImdbCode}"
-                                        Content="IMDb"
+                                        Command="{Binding GoToTmdbCommand}"
+                                        CommandParameter="{Binding Movie.TmdbId}"
+                                        Content="TMDb"
                                         Style="{DynamicResource SquareButtonStyle}" />
 
                                     <Button
@@ -562,6 +567,7 @@
                                                     </i:Interaction.Triggers>
                                                     <TextBlock FontSize="14" Text="{Binding Name}" />
                                                     <Border
+                                                        Margin="0,5,0,0"
                                                         HorizontalAlignment="Center"
                                                         VerticalAlignment="Top"
                                                         BorderThickness="1"
@@ -579,7 +585,8 @@
                                                                     Width="60"
                                                                     Height="60"
                                                                     HorizontalAlignment="Left"
-                                                                    Source="{Binding SmallImage}" />
+                                                                    ImageFailed="OnImageFailed"
+                                                                    Source="{Binding SmallImage, Converter={StaticResource PackIconMaterialImageSourceConverter}, ConverterParameter={StaticResource AccountCircle}}" />
                                                             </StackPanel>
                                                         </Grid>
                                                     </Border>

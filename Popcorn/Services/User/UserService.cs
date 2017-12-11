@@ -114,7 +114,7 @@ namespace Popcorn.Services.User
             {
                 User.DefaultSubtitleSize = new SubtitleSize
                 {
-                    Size = 16,
+                    Size = 22,
                     Label = LocalizationProviderHelper.GetLocalizedValue<string>("Normal")
                 };
             }
@@ -418,42 +418,6 @@ namespace Popcorn.Services.User
         public void SetCacheLocationPath(string path)
         {
             User.CacheLocation = path;
-        }
-
-        /// <summary>
-        /// True if torrent file association is enabled
-        /// </summary>
-        /// <returns></returns>
-        public bool GetTorrentFileAssociation()
-        {
-            return User.EnableTorrentFileAssociation;
-        }
-
-        /// <summary>
-        /// Set if torrent file association is enabled
-        /// </summary>
-        /// <param name="enableTorrentFileAssociation"></param>
-        public void SetTorrentFileAssociation(bool enableTorrentHandle)
-        {
-            User.EnableTorrentFileAssociation = enableTorrentHandle;
-        }
-
-        /// <summary>
-        /// Get if magnet link association is enabled
-        /// </summary>
-        /// <returns></returns>
-        public bool GetMagnetLinkAssociation()
-        {
-            return User.EnableMagnetLinkAssociation;
-        }
-
-        /// <summary>
-        /// Set if magnet link association is enabled
-        /// </summary>
-        /// <param name="enableMagnetLinkAssociation"></param>
-        public void SetMagnetLinkAssociation(bool enableMagnetLinkAssociation)
-        {
-            User.EnableMagnetLinkAssociation = enableMagnetLinkAssociation;
         }
 
         /// <summary>

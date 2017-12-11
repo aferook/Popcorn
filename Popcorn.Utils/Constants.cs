@@ -2,6 +2,7 @@
 using System.Collections.Specialized;
 using System.Configuration;
 using System.IO;
+using System.Reflection;
 
 namespace Popcorn.Utils
 {
@@ -13,7 +14,7 @@ namespace Popcorn.Utils
         /// <summary>
         /// App version
         /// </summary>
-        public const string AppVersion = "3.2.0";
+        public const string AppVersion = "3.4.6";
 
         /// <summary>
         /// Endpoint to API
@@ -26,29 +27,20 @@ namespace Popcorn.Utils
         public const string ServerUrl = "http://*:9900/";
 
         /// <summary>
-        /// Application Insights key
-        /// </summary>
-        public const string AiKey = "647b7610-bfc7-4b78-962d-822f7e59eda3";
-
-        /// <summary>
         /// Open Subtitles User Agent
         /// </summary>
         public const string OsdbUa = "Popcorn v1.0";
 
         /// <summary>
-        /// Trakt Client Api key
-        /// </summary>
-        public const string TraktClientApiKey = "a946923efa1f62c49cef3052d13591ee3584ce74ee3db6cb65c7baab8b63414f";
-
-        /// <summary>
-        /// Trakt Secret Api key
-        /// </summary>
-        public const string TraktSecretKey = "3c1633962c5654ec3cb124df7993a89f4aaf279992de3fde7435a749e8970650";
-
-        /// <summary>
         /// Client ID for TMDb
         /// </summary>
         public const string TmDbClientId = "a21fe922d3bac6654e93450e9a18af1c";
+
+        /// <summary>
+        /// Path to the FFmpeg shared libs
+        /// </summary>
+        public static string FFmpegPath => $@"{Directory.GetParent(new Uri(Assembly.GetExecutingAssembly().CodeBase)
+            .AbsolutePath)}\FFmpeg";
 
         /// <summary>
         /// In percentage, the minimum of buffering before we can actually start playing the movie
@@ -81,7 +73,7 @@ namespace Popcorn.Utils
                 }
                 catch (Exception)
                 {
-                    return 10d;
+                    return 15d;
                 }
             }
         }

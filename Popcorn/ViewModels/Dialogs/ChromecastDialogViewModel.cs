@@ -7,12 +7,11 @@ using GalaSoft.MvvmLight;
 using GalaSoft.MvvmLight.Command;
 using GalaSoft.MvvmLight.Messaging;
 using GalaSoft.MvvmLight.Threading;
+using GoogleCast;
 using NLog;
-using Popcorn.Chromecast;
-using Popcorn.Chromecast.Interfaces;
-using Popcorn.Chromecast.Models;
 using Popcorn.Helpers;
 using Popcorn.Messaging;
+using Popcorn.Services.Chromecast;
 using Popcorn.Utils.Exceptions;
 
 namespace Popcorn.ViewModels.Dialogs
@@ -26,7 +25,9 @@ namespace Popcorn.ViewModels.Dialogs
 
         private bool _loadingChromecasts;
 
-        private ObservableCollection<ChromecastReceiver> _chromecasts;
+        private readonly IChromecastService _chromecastService;
+
+        private ObservableCollection<IReceiver> _chromecasts;
 
         private ICommand _closeCommand;
 
@@ -46,10 +47,11 @@ namespace Popcorn.ViewModels.Dialogs
 
         private readonly CastMediaMessage _message;
 
-        public ChromecastDialogViewModel(CastMediaMessage message)
+        public ChromecastDialogViewModel(CastMediaMessage message, IChromecastService chromecastService)
         {
+            _chromecastService = chromecastService;
             _message = message;
-            Chromecasts = new ObservableCollection<ChromecastReceiver>();
+            Chromecasts = new ObservableCollection<IReceiver>();
             CloseCommand = new RelayCommand(() =>
             {
                 OnCloseAction.Invoke();
@@ -72,29 +74,33 @@ namespace Popcorn.ViewModels.Dialogs
             try
             {
                 LoadingChromecasts = true;
-                IChromecastLocator locator = new MdnsChromecastLocator();
-                Chromecasts = new ObservableCollection<ChromecastReceiver>(await locator.FindReceiversAsync());
+                Chromecasts = new ObservableCollection<IReceiver>(await _chromecastService.FindReceiversAsync());
                 LoadingChromecasts = false;
                 AnyChromecast = Chromecasts.Any();
-                ChooseChromecastDeviceCommand = new RelayCommand<ChromecastReceiver>(device =>
+                ChooseChromecastDeviceCommand = new RelayCommand<IReceiver>(async device =>
                 {
                     ConnectingToChromecast = true;
                     _message.ChromecastReceiver = device;
-                    _message.CloseCastDialog = () =>
-                    {
-                        ConnectingToChromecast = false;
-                        ConnectedToChromecast = true;
-                        CloseCommand.Execute(null);
-                    };
-
-                    Task.Run(async () =>
+                    _message.CloseCastDialog = OnCloseAction;
+                    if (await _chromecastService.ConnectAsync(device))
                     {
                         await _message.StartCast.Invoke(device);
-                    });
+                        ConnectingToChromecast = false;
+                        ConnectedToChromecast = true;
+                    }
+                    else
+                    {
+                        LoadingChromecasts = false;
+                        ConnectedToChromecast = false;
+                        Messenger.Default.Send(
+                            new UnhandledExceptionMessage(
+                                new PopcornException($"Could not cast to device {device.FriendlyName}")));
+                    }
                 });
             }
             catch (Exception ex)
             {
+                ConnectedToChromecast = false;
                 LoadingChromecasts = false;
                 AnyChromecast = false;
                 Logger.Error(ex);
@@ -135,7 +141,7 @@ namespace Popcorn.ViewModels.Dialogs
             set => Set(ref _chooseChromecastDeviceCommand, value);
         }
 
-        public ObservableCollection<ChromecastReceiver> Chromecasts
+        public ObservableCollection<IReceiver> Chromecasts
         {
             get => _chromecasts;
             set => Set(ref _chromecasts, value);

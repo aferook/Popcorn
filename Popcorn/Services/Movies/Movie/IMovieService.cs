@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Popcorn.Models.Genres;
 using Popcorn.Models.Movie;
 using Popcorn.Models.User;
+using Popcorn.YTVideoProvider;
 using TMDbLib.Client;
 using TMDbLib.Objects.General;
 using TMDbLib.Objects.People;
@@ -71,14 +72,10 @@ namespace Popcorn.Services.Movies.Movie
         /// <summary>
         /// Get similar movies
         /// </summary>
-        /// <param name="page">Page to return</param>
-        /// <param name="limit">The maximum number of movies to return</param>
         /// <param name="imdbIds">The imdbIds of the movies, split by comma</param>
         /// <param name="ct">Cancellation token</param>
         /// <returns>Similar movies</returns>
-        Task<(IEnumerable<MovieLightJson> movies, int nbMovies)> GetSimilarAsync(int page,
-            int limit,
-            IEnumerable<string> imdbIds,
+        Task<(IEnumerable<MovieLightJson> movies, int nbMovies)> GetSimilarAsync(IEnumerable<string> imdbIds,
             CancellationToken ct);
 
         /// <summary>
@@ -124,5 +121,12 @@ namespace Popcorn.Services.Movies.Movie
         /// <param name="url">Image to retrieve</param>
         /// <returns>Image url</returns>
         string GetImagePathFromTmdb(string url);
+
+        /// <summary>
+        /// Get <see cref="YouTubeVideo"/> from YTVideo Id
+        /// </summary>
+        /// <param name="ytVideoId"></param>
+        /// <returns></returns>
+        Task<YouTubeVideo> GetVideoFromYtVideoId(string ytVideoId);
     }
 }

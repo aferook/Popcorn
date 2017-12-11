@@ -45,6 +45,8 @@ Temporary Items
 # Nuget Packages
 packages/**/*
 
+.vs/**/*
+
 # Bin and obj
 Popcorn/Bin
 Popcorn/Obj
@@ -54,8 +56,6 @@ Popcorn.Spinner/Bin
 Popcorn.Spinner/Obj
 Popcorn.Utils/Bin
 Popcorn.Utils/Obj
-Popcorn.Chromecast/Bin
-Popcorn.Chromecast/Obj
 Popcorn.OSDB/Bin
 Popcorn.OSDB/Obj
 Popcorn.YTVideoProvider/Bin
@@ -66,14 +66,10 @@ Popcorn.ColorPicker/Bin
 Popcorn.ColorPicker/Obj
 Popcorn.ColorPickerControls/Bin
 Popcorn.ColorPickerControls/Obj
-Popcorn.Handler/Bin
-Popcorn.Handler/Obj
 Popcorn.Adorners/Bin
 Popcorn.Adorners/Obj
-Popcorn.Vlc/Bin
-Popcorn.Vlc/Obj
-Popcorn.Vlc.Wpf/Bin
-Popcorn.Vlc.Wpf/Obj
+Popcorn.FFME/Bin
+Popcorn.FFME/Obj
 Popcorn/edge
 
 # User files

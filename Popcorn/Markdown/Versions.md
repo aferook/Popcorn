@@ -1,4 +1,128 @@
-﻿# 3.2.0 - 19/10/2017 #
+﻿# 3.4.6 - 30/11/2017 #
+***
+Fixed issues
+
+### Details ###
+* Fixed issue [#157](https://github.com/bbougot/Popcorn/issues/157).
+* Fixed issue [#155](https://github.com/bbougot/Popcorn/issues/155).
+* Fixed issue [#153](https://github.com/bbougot/Popcorn/issues/153).
+* Fixed issue [#145](https://github.com/bbougot/Popcorn/issues/145).
+
+# 3.4.5 - 24/11/2017 #
+***
+Fixed issue
+
+### Details ###
+* Fixed issue with images
+
+# 3.4.4 - 22/11/2017 #
+***
+Fixed issues
+
+### Details ###
+* Fixed issue [#148](https://github.com/bbougot/Popcorn/issues/148).
+* Fixed issue [#146](https://github.com/bbougot/Popcorn/issues/146).
+* Fixed issue [#144](https://github.com/bbougot/Popcorn/issues/144).
+
+# 3.4.3 - 09/11/2017 #
+***
+Fixed issue
+
+### Details ###
+* Fixed issue with close button visibility for shows
+
+# 3.4.2 - 08/11/2017 #
+***
+Fixed issue
+
+### Details ###
+* Fixed issue with local server
+
+# 3.4.2 - 08/11/2017 #
+***
+Fixed issue
+
+### Details ###
+* Improved update system
+
+# 3.4.0 - 04/11/2017 #
+***
+Cleanup unused resources
+
+### Details ###
+* Refactoring and cleaning unused packages
+
+# 3.3.6 - 03/11/2017 #
+***
+Fixed issues
+
+### Details ###
+* Fixed issue [#137](https://github.com/bbougot/Popcorn/issues/137).
+
+# 3.3.5 - 02/11/2017 #
+***
+Fixed issues
+
+### Details ###
+* Fixed issue [#136](https://github.com/bbougot/Popcorn/issues/136).
+* Fixed issue [#134](https://github.com/bbougot/Popcorn/issues/134).
+
+# 3.3.4 - 31/10/2017 #
+***
+Add remaining time
+
+### Details ###
+* Fixed issue [#133](https://github.com/bbougot/Popcorn/issues/133).
+
+# 3.3.3 - 31/10/2017 #
+***
+Seekable movie stream
+
+### Details ###
+* Fixed issue [#15](https://github.com/bbougot/Popcorn/issues/15).
+
+# 3.3.2 - 30/10/2017 #
+***
+Fixed issues
+
+### Details ###
+* Fixed issue [#132](https://github.com/bbougot/Popcorn/issues/132).
+* Fixed issue [#131](https://github.com/bbougot/Popcorn/issues/131).
+* Fixed issue [#130](https://github.com/bbougot/Popcorn/issues/130).
+* Fixed issue [#129](https://github.com/bbougot/Popcorn/issues/129).
+
+# 3.3.1 - 30/10/2017 #
+***
+Fixed issue
+
+### Details ###
+* Fixed issue [#127](https://github.com/bbougot/Popcorn/issues/127).
+
+# 3.3.0 - 29/10/2017 #
+***
+Overall improvement
+
+### Details ###
+* Fixed issue [#113](https://github.com/bbougot/Popcorn/issues/113).
+* Fixed issue [#99](https://github.com/bbougot/Popcorn/issues/99).
+* Fixed issue [#85](https://github.com/bbougot/Popcorn/issues/85).
+
+# 3.2.2 - 21/10/2017 #
+***
+Fixed critical issue
+
+### Details ###
+* Fixed issue [#111](https://github.com/bbougot/Popcorn/issues/111).
+* Updated Vlc to 2.2.6
+
+# 3.2.1 - 20/10/2017 #
+***
+Fixed critical issue
+
+### Details ###
+* Fixed an issue which could let Popcorn crash if space key is pressed after playing a media.
+
+# 3.2.0 - 19/10/2017 #
 ***
 Fixed issues
 
@@ -62,8 +186,8 @@ Fixed issues
 Fixed issues
 
 ### Details ###
-* Fixed #101
-* Fixed #98
+* Fixed issue [#101](https://github.com/bbougot/Popcorn/issues/101).
+* Fixed issue [#98](https://github.com/bbougot/Popcorn/issues/98).
 
 # 3.0.1 - 02/10/2017 #
 ***

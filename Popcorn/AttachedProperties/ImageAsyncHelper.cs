@@ -1,8 +1,6 @@
 ﻿using System;
 using System.IO;
-using System.Linq;
 using System.Net.Http;
-using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
@@ -12,9 +10,7 @@ using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using GalaSoft.MvvmLight.Ioc;
 using GalaSoft.MvvmLight.Threading;
-using NLog;
 using Popcorn.Services.Cache;
-using Popcorn.Utils;
 
 namespace Popcorn.AttachedProperties
 {
@@ -22,7 +18,7 @@ namespace Popcorn.AttachedProperties
     {
         Thumbnail,
         Poster,
-        Backdrop,
+        Background,
         None
     }
 
@@ -32,18 +28,13 @@ namespace Popcorn.AttachedProperties
     public class ImageAsyncHelper : DependencyObject
     {
         /// <summary>
-        /// Logger of the class
-        /// </summary>
-        private static Logger Logger { get; } = LogManager.GetCurrentClassLogger();
-
-        /// <summary>
         /// Get ImageType
         /// </summary>
         /// <param name="obj"></param>
         /// <returns></returns>
         public static ImageType GetType(DependencyObject obj)
         {
-            return (ImageType)obj.GetValue(TypeProperty);
+            return (ImageType) obj.GetValue(TypeProperty);
         }
 
         /// <summary>
@@ -63,7 +54,7 @@ namespace Popcorn.AttachedProperties
             DependencyProperty.RegisterAttached("Type",
                 typeof(ImageType),
                 typeof(ImageAsyncHelper),
-                new PropertyMetadata(ImageType.Backdrop));
+                new PropertyMetadata(ImageType.Background));
 
         /// <summary>
         /// Get source uri
@@ -72,7 +63,7 @@ namespace Popcorn.AttachedProperties
         /// <returns></returns>
         public static string GetImagePath(DependencyObject obj)
         {
-            return (string)obj.GetValue(ImagePathProperty);
+            return (string) obj.GetValue(ImagePathProperty);
         }
 
         /// <summary>
@@ -96,7 +87,7 @@ namespace Popcorn.AttachedProperties
                 {
                     PropertyChangedCallback = async (obj, e) =>
                     {
-                        var image = (Image)obj;
+                        var image = (Image) obj;
                         var imageType = GetType(obj);
                         var resourceDictionary = new ResourceDictionary
                         {
@@ -128,7 +119,7 @@ namespace Popcorn.AttachedProperties
                             var mustDownload = false;
                             var cacheService = SimpleIoc.Default.GetInstance<ICacheService>();
                             var localFile = cacheService.Assets + hash;
-                            if(!File.Exists(localFile))
+                            if (!File.Exists(localFile))
                             {
                                 mustDownload = true;
                                 if (imageType == ImageType.Thumbnail)
@@ -231,27 +222,46 @@ namespace Popcorn.AttachedProperties
                                         });
                                     }
                                 }
-                                catch (Exception ex)
+                                catch (Exception)
                                 {
-                                    Logger.Error(ex);
+                                    DispatcherHelper.CheckBeginInvokeOnUI(() =>
+                                    {
+                                        if (imageType == ImageType.Thumbnail)
+                                        {
+                                            var errorThumbnail = resourceDictionary["ImageError"] as DrawingImage;
+                                            errorThumbnail.Freeze();
+                                            image.RenderTransformOrigin = new Point(0.5d, 0.5d);
+                                            image.RenderTransform = new TransformGroup();
+                                            image.Stretch = Stretch.None;
+                                            image.Source = errorThumbnail;
+                                        }
+                                        else
+                                        {
+                                            image.RenderTransformOrigin = new Point(0, 0);
+                                            image.RenderTransform = new TransformGroup();
+                                            image.Source = new BitmapImage();
+                                        }
+                                    });
                                 }
                             }).ConfigureAwait(false);
                         }
-                        catch (Exception ex)
+                        catch (Exception)
                         {
                             DispatcherHelper.CheckBeginInvokeOnUI(() =>
                             {
-                                Logger.Error(ex);
                                 if (imageType == ImageType.Thumbnail)
                                 {
                                     var errorThumbnail = resourceDictionary["ImageError"] as DrawingImage;
                                     errorThumbnail.Freeze();
                                     image.RenderTransformOrigin = new Point(0.5d, 0.5d);
+                                    image.RenderTransform = new TransformGroup();
                                     image.Stretch = Stretch.None;
                                     image.Source = errorThumbnail;
                                 }
                                 else
                                 {
+                                    image.RenderTransformOrigin = new Point(0, 0);
+                                    image.RenderTransform = new TransformGroup();
                                     image.Source = new BitmapImage();
                                 }
                             });

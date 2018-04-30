@@ -13,7 +13,7 @@ namespace Popcorn.Services.Shows.Show
         /// Change the culture of TMDb
         /// </summary>
         /// <param name="language">Language to set</param>
-        void ChangeTmdbLanguage(Language language);
+        Task ChangeTmdbLanguage(Language language);
 
         /// <summary>
         /// Get show by its Imdb code
@@ -30,6 +30,15 @@ namespace Popcorn.Services.Shows.Show
         /// <param name="ct">Cancellation</param>
         /// <returns>The show</returns>
         Task<ShowLightJson> GetShowLightAsync(string imdbId, CancellationToken ct);
+
+        /// <summary>
+        /// Get shows by ids
+        /// </summary>
+        /// <param name="imdbIds">The imdbIds of the shows, split by comma</param>
+        /// <param name="ct">Cancellation token</param>
+        /// <returns>Shows</returns>
+        Task<(IEnumerable<ShowLightJson> movies, int nbMovies)> GetShowsByIds(IEnumerable<string> imdbIds,
+            CancellationToken ct);
 
         /// <summary>
         /// Get popular shows by page

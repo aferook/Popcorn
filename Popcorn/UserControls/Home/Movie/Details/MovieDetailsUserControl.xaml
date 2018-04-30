@@ -15,13 +15,13 @@
     xmlns:lex="http://wpflocalizeextension.codeplex.com"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:movie="clr-namespace:Popcorn.Controls.Movie"
-    xmlns:tabs="clr-namespace:Popcorn.UserControls.Home.Movie.Tabs"
     d:DesignHeight="300"
     d:DesignWidth="300"
     lex:LocalizeDictionary.DesignCulture="en"
     lex:ResxLocalizationProvider.DefaultAssembly="Popcorn"
     lex:ResxLocalizationProvider.DefaultDictionary="Resources"
     DataContext="{Binding MovieDetails, Source={StaticResource Locator}}"
+    Loaded="OnLoaded"
     mc:Ignorable="d">
     <UserControl.Resources>
         <ResourceDictionary>
@@ -36,13 +36,11 @@
             </iconPacks:PackIconMaterialKind>
 
             <converters:PackIconMaterialImageSourceConverter x:Key="PackIconMaterialImageSourceConverter" />
-            <converters:ValueToBrushConverter x:Key="ValueToBrushConverter" />
             <converters:MultiBooleanToBoolConverter x:Key="MultiBooleanToBoolConverter" />
             <converters:BoolToInverseVisibilityConverter x:Key="BoolToInverseVisibilityConverter" />
             <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
             <converters:MultiBooleanToVisibilityConverter x:Key="MultiBooleanToVisibilityConverter" />
             <converters:BoolToInverseBoolConverter x:Key="BoolToInverseBoolConverter" />
-            <converters:TorrentHealthToLabelConverter x:Key="TorrentHealthToLabelConverter" />
             <DataTemplate DataType="{x:Type downloadViewModel:DownloadMovieViewModel}">
                 <download:DownloadMovieUserControl />
             </DataTemplate>
@@ -74,7 +72,7 @@
                 </Style.Triggers>
             </Style>
 
-            <Style x:Key="ProgressBarOnMovieLoading" TargetType="{x:Type controls:MetroProgressBar}">
+            <Style x:Key="ProgressRingOnMovieLoading" TargetType="{x:Type controls:ProgressRing}">
                 <Style.Triggers>
                     <DataTrigger Binding="{Binding Path=IsMovieLoading}" Value="True">
                         <DataTrigger.EnterActions>
@@ -140,45 +138,13 @@
         </ResourceDictionary>
     </UserControl.Resources>
     <Grid>
-        <controls:MetroProgressBar
-            Width="{Binding RelativeSource={RelativeSource FindAncestor, AncestorType=Grid}, Path=ActualWidth, Mode=OneWay}"
-            EllipseDiameter="6"
-            Foreground="{StaticResource AccentColorBrush}"
-            IsIndeterminate="True"
-            Style="{StaticResource ProgressBarOnMovieLoading}" />
-        <Grid
-            x:Name="MoviePageContainer"
-            Opacity="0.0"
-            Style="{StaticResource AnimationContentOnMovieLoading}">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="3*" />
-                <RowDefinition Height="*" />
-                <RowDefinition Height="3*" />
-            </Grid.RowDefinitions>
+        <Grid Opacity="0.0" Style="{StaticResource AnimationContentOnMovieLoading}">
             <Image
-                Grid.Row="0"
-                Grid.RowSpan="3"
-                attachedProperties:ImageAsyncHelper.ImagePath="{Binding Movie.BackgroundImage}"
+                attachedProperties:ImageAsyncHelper.ImagePath="{Binding Movie.BackgroundImage, IsAsync=True}"
                 attachedProperties:ImageAsyncHelper.Type="Background"
                 Opacity="0.3" />
-            <TextBlock
-                Grid.Row="0"
-                HorizontalAlignment="Center"
-                VerticalAlignment="Bottom"
-                FontSize="36"
-                Foreground="White"
-                Text="{lex:LocText LoadingTrailerLabel}"
-                TextTrimming="CharacterEllipsis"
-                Visibility="{Binding IsTrailerLoading, Converter={StaticResource BoolToInverseVisibilityConverter}}" />
-            <ContentControl
-                Grid.Row="0"
-                Grid.RowSpan="3"
-                Content="{Binding DownloadMovie}"
-                Visibility="{Binding IsDownloadingMovie, Converter={StaticResource BoolToInverseVisibilityConverter}}" />
-            <Grid
-                Grid.Row="0"
-                Grid.RowSpan="3"
-                Style="{StaticResource AnimationContentOnMediaLoading}">
+            <ContentControl Content="{Binding DownloadMovie}" Visibility="{Binding IsDownloadingMovie, Converter={StaticResource BoolToInverseVisibilityConverter}}" />
+            <Grid Style="{StaticResource AnimationContentOnMediaLoading}">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="1*" />
                     <RowDefinition Height="6*" />
@@ -197,7 +163,7 @@
                     Grid.Column="1"
                     HorizontalAlignment="Left"
                     VerticalAlignment="Top"
-                    attachedProperties:ImageAsyncHelper.ImagePath="{Binding Movie.PosterImage}"
+                    attachedProperties:ImageAsyncHelper.ImagePath="{Binding Movie.PosterImage, IsAsync=True}"
                     attachedProperties:ImageAsyncHelper.Type="Poster"
                     UseLayoutRounding="True">
                     <Image.Effect>
@@ -240,8 +206,9 @@
                                         Command="{Binding SetWatchedMovieCommand}"
                                         CommandParameter="{Binding Movie.HasBeenSeen}"
                                         IsChecked="{Binding Movie.HasBeenSeen}"
-                                        Style="{StaticResource MetroCircleToggleButtonStyle}">
-                                        <iconPacks:PackIconFontAwesome
+                                        Style="{StaticResource MetroCircleToggleButtonStyle}"
+                                        ToolTip="Seen">
+                                        <iconPacks:PackIconModern
                                             Width="30"
                                             Height="30"
                                             VerticalAlignment="Center"
@@ -257,7 +224,8 @@
                                         Command="{Binding SetFavoriteMovieCommand}"
                                         CommandParameter="{Binding Movie.IsFavorite}"
                                         IsChecked="{Binding Movie.IsFavorite}"
-                                        Style="{StaticResource MetroCircleToggleButtonStyle}">
+                                        Style="{StaticResource MetroCircleToggleButtonStyle}"
+                                        ToolTip="Liked">
                                         <Rectangle
                                             Width="20"
                                             Height="20"
@@ -284,48 +252,6 @@
                                             </Rectangle.OpacityMask>
                                         </Rectangle>
                                     </ToggleButton>
-                                    <Grid
-                                        Width="50"
-                                        Height="50"
-                                        Margin="5,0,0,0"
-                                        VerticalAlignment="Center">
-                                        <Viewbox
-                                            Width="50"
-                                            Height="50"
-                                            Opacity="0.8">
-                                            <Canvas Width="24" Height="24">
-                                                <Path Data="M13,9H11V7H13M13,17H11V11H13M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z" Fill="White" />
-                                            </Canvas>
-                                        </Viewbox>
-                                        <Rectangle
-                                            Width="32"
-                                            Height="32"
-                                            Fill="Transparent" />
-                                        <Grid.ToolTip>
-                                            <StackPanel Orientation="Vertical">
-                                                <StackPanel Orientation="Horizontal">
-                                                    <TextBlock Text="Seeders:" />
-                                                    <TextBlock Margin="5,0,0,0" Text="{Binding SelectedTorrent.Seeds}" />
-                                                </StackPanel>
-                                                <StackPanel Margin="0,5,0,0" Orientation="Horizontal">
-                                                    <TextBlock Text="Peers:" />
-                                                    <TextBlock Margin="5,0,0,0" Text="{Binding SelectedTorrent.Peers}" />
-                                                </StackPanel>
-                                                <StackPanel Margin="0,5,0,0" Orientation="Horizontal">
-                                                    <TextBlock Text="Size:" />
-                                                    <TextBlock Margin="5,0,0,0" Text="{Binding SelectedTorrent.Size}" />
-                                                </StackPanel>
-                                                <StackPanel Margin="0,5,0,0" Orientation="Horizontal">
-                                                    <TextBlock Text="{lex:LocText HealthLabel}" />
-                                                    <TextBlock Text=":" />
-                                                    <TextBlock
-                                                        Margin="5,0,0,0"
-                                                        Foreground="{Binding Path=TorrentHealth, Converter={StaticResource ValueToBrushConverter}, ConverterParameter='0|10', UpdateSourceTrigger=PropertyChanged}"
-                                                        Text="{Binding Path=TorrentHealth, Converter={StaticResource TorrentHealthToLabelConverter}, ConverterParameter='0|10', UpdateSourceTrigger=PropertyChanged}" />
-                                                </StackPanel>
-                                            </StackPanel>
-                                        </Grid.ToolTip>
-                                    </Grid>
                                 </StackPanel>
 
                             </Grid>
@@ -422,7 +348,7 @@
                                 </TextBlock>
                             </Grid>
                         </DockPanel>
-                        <DockPanel DockPanel.Dock="Bottom">
+                        <DockPanel Margin="0,15,0,0" DockPanel.Dock="Bottom">
                             <Grid HorizontalAlignment="Stretch">
                                 <WrapPanel HorizontalAlignment="Left" Orientation="Horizontal">
                                     <Button
@@ -435,7 +361,6 @@
                                         CommandParameter="{Binding Movie.TmdbId}"
                                         Content="TMDb"
                                         Style="{DynamicResource SquareButtonStyle}" />
-
                                     <Button
                                         Width="100"
                                         Height="30"
@@ -458,36 +383,6 @@
                                         Content="{lex:LocText WatchButton}"
                                         IsTabStop="False"
                                         Style="{DynamicResource SquareButtonStyle}" />
-                                    <controls:SplitButton
-                                        Width="130"
-                                        Height="35"
-                                        Margin="0,0,10,0"
-                                        HorizontalAlignment="Right"
-                                        VerticalAlignment="Center"
-                                        HorizontalContentAlignment="Left"
-                                        DisplayMemberPath="Sub.LanguageName"
-                                        ItemsSource="{Binding Movie.AvailableSubtitles}"
-                                        SelectedItem="{Binding Movie.SelectedSubtitle, UpdateSourceTrigger=PropertyChanged}">
-                                        <controls:SplitButton.Icon>
-                                            <iconPacks:PackIconMaterial Margin="6" Kind="Translate" />
-                                        </controls:SplitButton.Icon>
-                                    </controls:SplitButton>
-                                    <controls:ProgressRing
-                                        Width="20"
-                                        Height="20"
-                                        Margin="0,0,10,0"
-                                        VerticalAlignment="Center"
-                                        IsActive="True"
-                                        Visibility="{Binding LoadingSubtitles, Converter={StaticResource BoolToInverseVisibilityConverter}}" />
-                                    <controls:ToggleSwitch
-                                        HorizontalAlignment="Right"
-                                        VerticalAlignment="Center"
-                                        Header="{lex:LocText MovieQualityLabel}"
-                                        IsChecked="{Binding Movie.WatchInFullHdQuality}"
-                                        IsEnabled="{Binding Movie.FullHdAvailable}"
-                                        OffLabel="720"
-                                        OnLabel="1080"
-                                        Style="{StaticResource MahApps.Metro.Styles.ToggleSwitch.Win10}" />
                                 </WrapPanel>
                             </Grid>
                         </DockPanel>
@@ -743,7 +638,7 @@
                                                     Grid.ColumnSpan="3"
                                                     HorizontalAlignment="Center"
                                                     VerticalAlignment="Center"
-                                                    attachedProperties:ImageAsyncHelper.ImagePath="{Binding PosterImage}"
+                                                    attachedProperties:ImageAsyncHelper.ImagePath="{Binding PosterImage, Mode=OneTime, IsAsync=True}"
                                                     attachedProperties:ImageAsyncHelper.Type="Thumbnail" />
                                                 <Grid
                                                     x:Name="PlayCanvas"
@@ -793,7 +688,8 @@
                                             HorizontalAlignment="Left"
                                             FontSize="12"
                                             Foreground="Gray"
-                                            Text="{Binding Genres}" />
+                                            Text="{Binding Genres}"
+                                            TextTrimming="CharacterEllipsis" />
                                         <TextBlock
                                             Width="100"
                                             HorizontalAlignment="Left"
@@ -828,23 +724,64 @@
                     </TextBlock>
                 </Grid>
             </Grid>
-            <controls:ProgressRing
-                Grid.Row="1"
+            <StackPanel
+                HorizontalAlignment="Center"
                 VerticalAlignment="Center"
-                Foreground="{StaticResource AccentColorBrush}"
+                Orientation="Vertical">
+                <controls:ProgressRing
+                    VerticalAlignment="Center"
+                    Foreground="{StaticResource AccentColorBrush}"
+                    IsActive="True"
+                    Visibility="{Binding IsTrailerLoading, Converter={StaticResource BoolToInverseVisibilityConverter}}" />
+                <TextBlock
+                    Margin="0,10,0,0"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Bottom"
+                    FontSize="36"
+                    Foreground="White"
+                    Text="{lex:LocText LoadingTrailerLabel}"
+                    TextTrimming="CharacterEllipsis"
+                    Visibility="{Binding IsTrailerLoading, Converter={StaticResource BoolToInverseVisibilityConverter}}" />
+                <Button
+                    Width="100"
+                    Height="30"
+                    Margin="0,15,0,0"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Top"
+                    controls:ControlsHelper.ContentCharacterCasing="Normal"
+                    Command="{Binding StopLoadingTrailerCommand}"
+                    Content="{lex:LocText CancelButton}"
+                    Style="{DynamicResource SquareButtonStyle}"
+                    Visibility="{Binding IsTrailerLoading, Converter={StaticResource BoolToInverseVisibilityConverter}}" />
+            </StackPanel>
+        </Grid>
+        <StackPanel
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center"
+            Orientation="Vertical"
+            Visibility="{Binding IsMovieLoading, Converter={StaticResource BoolToInverseVisibilityConverter}}">
+            <controls:ProgressRing
+                Width="40"
+                Height="40"
+                VerticalAlignment="Center"
                 IsActive="True"
-                Visibility="{Binding IsTrailerLoading, Converter={StaticResource BoolToInverseVisibilityConverter}}" />
+                Style="{StaticResource ProgressRingOnMovieLoading}" />
+            <TextBlock
+                Margin="0,10,0,0"
+                HorizontalAlignment="Center"
+                FontSize="36"
+                Foreground="White"
+                Text="{lex:LocText Loading}"
+                TextTrimming="CharacterEllipsis" />
             <Button
-                Grid.Row="2"
                 Width="100"
                 Height="30"
+                Margin="0,15,0,0"
                 HorizontalAlignment="Center"
-                VerticalAlignment="Top"
                 controls:ControlsHelper.ContentCharacterCasing="Normal"
-                Command="{Binding StopLoadingTrailerCommand}"
+                Command="{Binding StopLoadingMovieCommand}"
                 Content="{lex:LocText CancelButton}"
-                Style="{DynamicResource SquareButtonStyle}"
-                Visibility="{Binding IsTrailerLoading, Converter={StaticResource BoolToInverseVisibilityConverter}}" />
-        </Grid>
+                Style="{DynamicResource SquareButtonStyle}" />
+        </StackPanel>
     </Grid>
 </UserControl>

@@ -39,7 +39,7 @@ namespace Popcorn.Services.Subtitles
             {
                 return await retryGetSubLanguagesPolicy.ExecuteAsync(async () =>
                 {
-                    using (var osdb = new Osdb().Login(Constants.OsdbUa))
+                    using (var osdb = await new Osdb().Login(Constants.OsdbUa))
                     {
                         return await osdb.GetSubLanguages();
                     }
@@ -69,7 +69,7 @@ namespace Popcorn.Services.Subtitles
 
             return await retrySearchSubtitlesFromImdbPolicy.ExecuteAsync(async () =>
             {
-                using (var osdb = new Osdb().Login(Constants.OsdbUa))
+                using (var osdb = await new Osdb().Login(Constants.OsdbUa))
                 {
                     return await osdb.SearchSubtitlesFromImdb(languages, imdbId, season, episode);
                 }
@@ -81,8 +81,9 @@ namespace Popcorn.Services.Subtitles
         /// </summary>
         /// <param name="path">Path to download</param>
         /// <param name="subtitle">Subtitle to download</param>
+        /// <param name="remote">Is remote download path</param>
         /// <returns>Downloaded subtitle path</returns>
-        public async Task<string> DownloadSubtitleToPath(string path, Subtitle subtitle)
+        public async Task<string> DownloadSubtitleToPath(string path, Subtitle subtitle, bool remote = true)
         {
             var retryDownloadSubtitleToPathPolicy = Policy
                 .Handle<XmlRpcServerException>()
@@ -92,9 +93,9 @@ namespace Popcorn.Services.Subtitles
 
             return await retryDownloadSubtitleToPathPolicy.ExecuteAsync(async () =>
             {
-                using (var osdb = new Osdb().Login(Constants.OsdbUa))
+                using (var osdb = await new Osdb().Login(Constants.OsdbUa))
                 {
-                    return await osdb.DownloadSubtitleToPath(path, subtitle);
+                    return await osdb.DownloadSubtitleToPath(path, subtitle, remote);
                 }
             });
         }
@@ -110,7 +111,7 @@ namespace Popcorn.Services.Subtitles
             var parser = new SubtitlesParser.Classes.Parsers.SubParser();
             using (var fileStream = File.OpenRead(filePath))
             {
-                return parser.ParseStream(fileStream, Encoding.GetEncoding("iso-8859-1"));
+                return parser.ParseStream(fileStream, Encoding.UTF8);
             }
         }
 
@@ -124,8 +125,8 @@ namespace Popcorn.Services.Subtitles
             try
             {
                 var path = Path.ChangeExtension(sFilePath, "vtt");
-                using (var strReader = new StreamReader(sFilePath, Encoding.GetEncoding("iso-8859-1")))
-                using (var strWriter = new StreamWriter(File.Create(path), Encoding.GetEncoding("iso-8859-1")))
+                using (var strReader = new StreamReader(sFilePath, Encoding.UTF8))
+                using (var strWriter = new StreamWriter(File.Create(path), Encoding.UTF8))
                 {
                     var rgxDialogNumber = new Regex(@"^\d+$");
                     var rgxTimeFrame = new Regex(@"(\d\d:\d\d:\d\d,\d\d\d) --> (\d\d:\d\d:\d\d,\d\d\d)");

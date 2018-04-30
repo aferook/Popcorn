@@ -9,6 +9,7 @@ using System.Windows.Media.Animation;
 using GalaSoft.MvvmLight.Messaging;
 using Popcorn.Controls;
 using Popcorn.Extensions;
+using Popcorn.Helpers;
 using Popcorn.Messaging;
 using Popcorn.Utils;
 using Popcorn.ViewModels.Windows;
@@ -36,7 +37,6 @@ namespace Popcorn.Windows
                 vm.NavigationService = MainFrame.NavigationService;
             }
 
-            StateChanged += OnStateChanged;
             Messenger.Default.Register<DropFileMessage>(this, e =>
             {
                 if (e.Event == DropFileMessage.DropFileEvent.Enter)
@@ -114,13 +114,6 @@ namespace Popcorn.Windows
             }
         }
 
-        private void OnStateChanged(object sender, EventArgs e)
-        {
-            MovieDetailsUc.Margin = WindowState == WindowState.Maximized
-                ? new Thickness(0, 0, 16, 0)
-                : new Thickness(0, 0, 0, 0);
-        }
-
         private void OnKeyDown(object sender, KeyEventArgs e)
         {
             var searchBox =
@@ -129,11 +122,6 @@ namespace Popcorn.Windows
             {
                 var vm = DataContext as WindowViewModel;
                 vm?.OpenAboutCommand.Execute(null);
-            }
-            else if (e.Key == Key.F1)
-            {
-                var vm = DataContext as WindowViewModel;
-                vm?.OpenHelpCommand.Execute(null);
             }
             else if (e.Key == Key.F3 || (Keyboard.Modifiers & ModifierKeys.Shift) == ModifierKeys.Shift &&
                      e.Key == Key.F)

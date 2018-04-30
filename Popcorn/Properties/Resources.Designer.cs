@@ -439,6 +439,15 @@ namespace Popcorn.Properties {
         }
         
         /// <summary>
+        ///   Recherche une chaîne localisée semblable à Failed loading.
+        /// </summary>
+        public static string FailedLoadingLabel {
+            get {
+                return ResourceManager.GetString("FailedLoadingLabel", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Recherche une chaîne localisée semblable à A critical error has occured. You should restart the app immediately..
         /// </summary>
         public static string FatalError {
@@ -520,6 +529,15 @@ namespace Popcorn.Properties {
         }
         
         /// <summary>
+        ///   Recherche une chaîne localisée semblable à Informations.
+        /// </summary>
+        public static string InformationsLabel {
+            get {
+                return ResourceManager.GetString("InformationsLabel", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Recherche une chaîne localisée semblable à Language.
         /// </summary>
         public static string LanguageLabel {
@@ -552,6 +570,15 @@ namespace Popcorn.Properties {
         public static string LicenseLabel {
             get {
                 return ResourceManager.GetString("LicenseLabel", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Recherche une chaîne localisée semblable à Loading....
+        /// </summary>
+        public static string Loading {
+            get {
+                return ResourceManager.GetString("Loading", resourceCulture);
             }
         }
         
@@ -754,6 +781,15 @@ namespace Popcorn.Properties {
         }
         
         /// <summary>
+        ///   Recherche une chaîne localisée semblable à OPTIONS.
+        /// </summary>
+        public static string OptionsLabel {
+            get {
+                return ResourceManager.GetString("OptionsLabel", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Recherche une chaîne localisée semblable à Password....
         /// </summary>
         public static string PasswordWatermark {
@@ -804,6 +840,15 @@ namespace Popcorn.Properties {
         public static string PopularTitleTab {
             get {
                 return ResourceManager.GetString("PopularTitleTab", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Recherche une chaîne localisée semblable à Quality.
+        /// </summary>
+        public static string QualityLabel {
+            get {
+                return ResourceManager.GetString("QualityLabel", resourceCulture);
             }
         }
         

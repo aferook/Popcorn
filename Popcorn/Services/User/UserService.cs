@@ -114,7 +114,7 @@ namespace Popcorn.Services.User
             {
                 User.DefaultSubtitleSize = new SubtitleSize
                 {
-                    Size = 22,
+                    Size = 26,
                     Label = LocalizationProviderHelper.GetLocalizedValue<string>("Normal")
                 };
             }
@@ -136,12 +136,11 @@ namespace Popcorn.Services.User
         /// <param name="movies">All movies to compute</param>
         public void SyncMovieHistory(IEnumerable<IMovie> movies)
         {
-            var watch = Stopwatch.StartNew();
             try
             {
                 foreach (var movie in movies)
                 {
-                    var updatedMovie = User.MovieHistory.FirstOrDefault(p => p.ImdbId == movie.ImdbCode);
+                    var updatedMovie = User.MovieHistory.FirstOrDefault(p => p.ImdbId == movie.ImdbId);
                     if (updatedMovie == null) continue;
                     movie.IsFavorite = updatedMovie.Favorite;
                     movie.HasBeenSeen = updatedMovie.Seen;
@@ -152,13 +151,6 @@ namespace Popcorn.Services.User
                 Logger.Error(
                     $"SyncMovieHistory: {exception.Message}");
             }
-            finally
-            {
-                watch.Stop();
-                var elapsedMs = watch.ElapsedMilliseconds;
-                Logger.Debug(
-                    $"SyncMovieHistory in {elapsedMs} milliseconds.");
-            }
         }
 
         /// <summary>
@@ -167,7 +159,6 @@ namespace Popcorn.Services.User
         /// <param name="shows">All shows to compute</param>
         public void SyncShowHistory(IEnumerable<IShow> shows)
         {
-            var watch = Stopwatch.StartNew();
             try
             {
                 foreach (var show in shows)
@@ -182,13 +173,6 @@ namespace Popcorn.Services.User
                 Logger.Error(
                     $"SyncShowHistory: {exception.Message}");
             }
-            finally
-            {
-                watch.Stop();
-                var elapsedMs = watch.ElapsedMilliseconds;
-                Logger.Debug(
-                    $"SyncShowHistory in {elapsedMs} milliseconds.");
-            }
         }
 
         /// <summary>
@@ -197,15 +181,14 @@ namespace Popcorn.Services.User
         /// <param name="movie">Movie</param>
         public void SetMovie(IMovie movie)
         {
-            var watch = Stopwatch.StartNew();
             try
             {
-                var movieToUpdate = User.MovieHistory.FirstOrDefault(a => a.ImdbId == movie.ImdbCode);
+                var movieToUpdate = User.MovieHistory.FirstOrDefault(a => a.ImdbId == movie.ImdbId);
                 if (movieToUpdate == null)
                 {
                     User.MovieHistory.Add(new MovieHistory
                     {
-                        ImdbId = movie.ImdbCode,
+                        ImdbId = movie.ImdbId,
                         Favorite = movie.IsFavorite,
                         Seen = movie.HasBeenSeen
                     });
@@ -220,13 +203,6 @@ namespace Popcorn.Services.User
             {
                 Logger.Error(
                     $"SetMovie: {exception.Message}");
-            }
-            finally
-            {
-                watch.Stop();
-                var elapsedMs = watch.ElapsedMilliseconds;
-                Logger.Debug(
-                    $"SetMovie ({movie.ImdbCode}) in {elapsedMs} milliseconds.");
             }
         }
 
@@ -435,7 +411,7 @@ namespace Popcorn.Services.User
             };
             watch.Stop();
             var elapsedMs = watch.ElapsedMilliseconds;
-            Logger.Debug(
+            Logger.Trace(
                 $"GetAvailableLanguages in {elapsedMs} milliseconds.");
 
             return availableLanguages;
@@ -484,11 +460,11 @@ namespace Popcorn.Services.User
         /// Set the current language of the application
         /// </summary>
         /// <param name="language">Language</param>
-        public void SetCurrentLanguage(Language language)
+        public async Task SetCurrentLanguage(Language language)
         {
             User.Language.Culture = language.Culture;
-            MovieService.ChangeTmdbLanguage(language);
-            ShowService.ChangeTmdbLanguage(language);
+            await MovieService.ChangeTmdbLanguage(language);
+            await ShowService.ChangeTmdbLanguage(language);
             try
             {
                 LocalizeDictionary.Instance.Culture = new CultureInfo(language.Culture);

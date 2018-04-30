@@ -1,8 +1,8 @@
 ﻿using System.Diagnostics.CodeAnalysis;
+using CommonServiceLocator;
 using Enterwell.Clients.Wpf.Notifications;
 using GalaSoft.MvvmLight.Ioc;
 using GoogleCast;
-using Microsoft.Practices.ServiceLocation;
 using Popcorn.Services.Application;
 using Popcorn.Services.Cache;
 using Popcorn.Services.Chromecast;
@@ -20,6 +20,7 @@ using Popcorn.ViewModels.Pages.Home.Show.Details;
 using Popcorn.ViewModels.Windows;
 using Popcorn.ViewModels.Windows.Settings;
 using Popcorn.Services.Shows.Trailer;
+using Popcorn.Services.Tmdb;
 using Popcorn.ViewModels.Pages.Home.Cast;
 
 namespace Popcorn.ViewModels
@@ -32,11 +33,10 @@ namespace Popcorn.ViewModels
     {
         static ViewModelLocator()
         {
-            ServiceLocator.SetLocatorProvider(() => SimpleIoc.Default);
-
             #region Services
-            var movieService = new MovieService();
-            var showService = new ShowService();
+            var tmdbService = new TmdbService();
+            var movieService = new MovieService(tmdbService);
+            var showService = new ShowService(tmdbService);
             SimpleIoc.Default.Register<IUserService>(() => new UserService(movieService, showService));
             SimpleIoc.Default.Register<IMovieService>(() => movieService);
             SimpleIoc.Default.Register<IShowService>(() => showService);
@@ -77,7 +77,7 @@ namespace Popcorn.ViewModels
         [SuppressMessage("Microsoft.Performance",
             "CA1822:MarkMembersAsStatic",
             Justification = "This non-static member is needed for data binding purposes.")]
-        public WindowViewModel Window => ServiceLocator.Current.GetInstance<WindowViewModel>();
+        public WindowViewModel Window => SimpleIoc.Default.GetInstance<WindowViewModel>();
 
         /// <summary>
         /// Gets the Pages property.
@@ -85,7 +85,7 @@ namespace Popcorn.ViewModels
         [SuppressMessage("Microsoft.Performance",
             "CA1822:MarkMembersAsStatic",
             Justification = "This non-static member is needed for data binding purposes.")]
-        public PagesViewModel Pages => ServiceLocator.Current.GetInstance<PagesViewModel>();
+        public PagesViewModel Pages => SimpleIoc.Default.GetInstance<PagesViewModel>();
 
         /// <summary>
         /// Gets the MovieDetails property.
@@ -93,7 +93,7 @@ namespace Popcorn.ViewModels
         [SuppressMessage("Microsoft.Performance",
             "CA1822:MarkMembersAsStatic",
             Justification = "This non-static member is needed for data binding purposes.")]
-        public MovieDetailsViewModel MovieDetails => ServiceLocator.Current.GetInstance<MovieDetailsViewModel>();
+        public MovieDetailsViewModel MovieDetails => SimpleIoc.Default.GetInstance<MovieDetailsViewModel>();
 
         /// <summary>
         /// Gets the ShowDetails property.
@@ -101,7 +101,7 @@ namespace Popcorn.ViewModels
         [SuppressMessage("Microsoft.Performance",
             "CA1822:MarkMembersAsStatic",
             Justification = "This non-static member is needed for data binding purposes.")]
-        public ShowDetailsViewModel ShowDetails => ServiceLocator.Current.GetInstance<ShowDetailsViewModel>();
+        public ShowDetailsViewModel ShowDetails => SimpleIoc.Default.GetInstance<ShowDetailsViewModel>();
 
         /// <summary>
         /// Gets the Cast property.
@@ -109,7 +109,7 @@ namespace Popcorn.ViewModels
         [SuppressMessage("Microsoft.Performance",
             "CA1822:MarkMembersAsStatic",
             Justification = "This non-static member is needed for data binding purposes.")]
-        public CastViewModel Cast => ServiceLocator.Current.GetInstance<CastViewModel>();
+        public CastViewModel Cast => SimpleIoc.Default.GetInstance<CastViewModel>();
 
         /// <summary>
         /// Gets the ApplicationSettings property.
@@ -118,7 +118,7 @@ namespace Popcorn.ViewModels
             "CA1822:MarkMembersAsStatic",
             Justification = "This non-static member is needed for data binding purposes.")]
         public ApplicationSettingsViewModel ApplicationSettings
-            => ServiceLocator.Current.GetInstance<ApplicationSettingsViewModel>();
+            => SimpleIoc.Default.GetInstance<ApplicationSettingsViewModel>();
 
         /// <summary>
         /// Gets the NotificationMessageManager property.
@@ -127,6 +127,6 @@ namespace Popcorn.ViewModels
             "CA1822:MarkMembersAsStatic",
             Justification = "This non-static member is needed for data binding purposes.")]
         public NotificationMessageManager Manager
-            => ServiceLocator.Current.GetInstance<NotificationMessageManager>();
+            => SimpleIoc.Default.GetInstance<NotificationMessageManager>();
     }
 }

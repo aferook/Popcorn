@@ -4,10 +4,8 @@ using System.Threading.Tasks;
 using Popcorn.Models.Genres;
 using Popcorn.Models.Movie;
 using Popcorn.Models.User;
-using Popcorn.YTVideoProvider;
-using TMDbLib.Client;
-using TMDbLib.Objects.General;
 using TMDbLib.Objects.People;
+using VideoLibrary;
 
 namespace Popcorn.Services.Movies.Movie
 {
@@ -17,7 +15,7 @@ namespace Popcorn.Services.Movies.Movie
         /// Change the culture of TMDb
         /// </summary>
         /// <param name="language">Language to set</param>
-        void ChangeTmdbLanguage(Language language);
+        Task ChangeTmdbLanguage(Language language);
 
         /// <summary>
         /// Get movie by its Imdb code
@@ -70,20 +68,39 @@ namespace Popcorn.Services.Movies.Movie
             CancellationToken ct);
 
         /// <summary>
-        /// Get similar movies
+        /// Get movies by ids
         /// </summary>
         /// <param name="imdbIds">The imdbIds of the movies, split by comma</param>
         /// <param name="ct">Cancellation token</param>
-        /// <returns>Similar movies</returns>
-        Task<(IEnumerable<MovieLightJson> movies, int nbMovies)> GetSimilarAsync(IEnumerable<string> imdbIds,
+        /// <returns>Movies</returns>
+        Task<(IEnumerable<MovieLightJson> movies, int nbMovies)> GetMoviesByIds(IEnumerable<string> imdbIds,
             CancellationToken ct);
+
+        /// <summary>
+        /// Get similar movies
+        /// </summary>
+        /// <param name="page">Page</param>
+        /// <param name="limit">Limit</param>
+        /// <param name="ratingFilter">Rating</param>
+        /// <param name="sortBy">SortBy</param>
+        /// <param name="imdbIds">The imdbIds of the movies, split by comma</param>
+        /// <param name="ct">Cancellation token</param>
+        /// <param name="genre">Genre</param>
+        /// <returns>Similar movies</returns>
+        Task<(IEnumerable<MovieLightJson> movies, int nbMovies)> GetSimilar(int page,
+            int limit,
+            double ratingFilter,
+            string sortBy,
+            IEnumerable<string> imdbIds,
+            CancellationToken ct,
+            GenreJson genre = null);
 
         /// <summary>
         /// Translate movie informations (title, description, ...)
         /// </summary>
         /// <param name="movieToTranslate">Movie to translate</param>
         /// <returns>Task</returns>
-        void TranslateMovie(IMovie movieToTranslate);
+        Task TranslateMovie(IMovie movieToTranslate);
 
         /// <summary>
         /// Get the youtube trailer of a movie
@@ -120,7 +137,7 @@ namespace Popcorn.Services.Movies.Movie
         /// </summary>
         /// <param name="url">Image to retrieve</param>
         /// <returns>Image url</returns>
-        string GetImagePathFromTmdb(string url);
+        Task<string> GetImagePathFromTmdb(string url);
 
         /// <summary>
         /// Get <see cref="YouTubeVideo"/> from YTVideo Id

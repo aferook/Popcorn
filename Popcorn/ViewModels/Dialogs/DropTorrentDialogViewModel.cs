@@ -5,7 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using GalaSoft.MvvmLight;
-using GalaSoft.MvvmLight.Command;
+using GalaSoft.MvvmLight.CommandWpf;
 using GalaSoft.MvvmLight.Messaging;
 using NLog;
 using Popcorn.Messaging;
@@ -107,10 +107,7 @@ namespace Popcorn.ViewModels.Dialogs
 
         public async Task Download(int uploadLimit, int downloadLimit, Action buffered, Action cancelled)
         {
-            TorrentType torrentType;
-            torrentType = File.ReadLines(TorrentPath).Any(line => line.Contains("magnet"))
-                ? TorrentType.Magnet
-                : TorrentType.File;
+            var torrentType = TorrentPath.Contains("magnet:?") ? TorrentType.Magnet : TorrentType.File;
 
             var media = new MediaFile();
             var downloadProgress = new Progress<double>(e =>

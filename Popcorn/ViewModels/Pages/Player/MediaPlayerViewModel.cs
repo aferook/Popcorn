@@ -13,11 +13,10 @@ using System.Windows.Input;
 using Popcorn.Helpers;
 using System.IO;
 using System.Linq;
-using System.Net;
-using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using GalaSoft.MvvmLight.Ioc;
+using GalaSoft.MvvmLight.Threading;
 using GoogleCast;
 using GoogleCast.Models.Media;
 using Popcorn.Services.Subtitles;
@@ -86,6 +85,11 @@ namespace Popcorn.ViewModels.Pages.Player
         /// The media name
         /// </summary>
         public readonly string MediaName;
+
+        /// <summary>
+        /// The media volume from 0 to 1
+        /// </summary>
+        private double _volume;
 
         /// <summary>
         /// The media duration in seconds
@@ -342,74 +346,92 @@ namespace Popcorn.ViewModels.Pages.Player
 
             StopCastCommand = new RelayCommand(async () => { await StopCastPlayer(); });
 
-            SelectSubtitlesCommand = new RelayCommand(async () =>
+            SelectSubtitlesCommand = new RelayCommand<string>(async sub =>
             {
-                IsSubtitleChosen = !IsSubtitleChosen;
-                var previousSubtitleChosen = IsSubtitleChosen;
-                try
+                if (!string.IsNullOrEmpty(sub))
                 {
-                    IsSubtitleChosen = false;
-                    OnPausedMedia(new EventArgs());
-                    var message = new ShowSubtitleDialogMessage(_subtitles, CurrentSubtitle);
-                    await Messenger.Default.SendAsync(message);
-                    if (message.SelectedSubtitle != null &&
-                        message.SelectedSubtitle.LanguageName !=
-                        LocalizationProviderHelper.GetLocalizedValue<string>("NoneLabel") &&
-                        message.SelectedSubtitle.SubtitleId != "custom")
+                    OnSubtitleChosen(
+                        new SubtitleChangedEventArgs(sub, new OSDB.Subtitle
+                        {
+                            LanguageId = LocalizationProviderHelper.GetLocalizedValue<string>("CustomLabel"),
+                            LanguageName = LocalizationProviderHelper.GetLocalizedValue<string>("CustomLabel"),
+                            SubtitleId = "custom",
+                            SubtitleFileName = sub
+                        }));
+                    IsSubtitleChosen = true;
+                }
+                else
+                {
+                    IsSubtitleChosen = !IsSubtitleChosen;
+                    var previousSubtitleChosen = IsSubtitleChosen;
+                    try
                     {
-                        OnResumedMedia(new EventArgs());
-                        if (CurrentSubtitle != null && CurrentSubtitle.ImdbId == message.SelectedSubtitle.ImdbId)
+                        IsSubtitleChosen = false;
+                        OnPausedMedia(new EventArgs());
+                        var message = new ShowSubtitleDialogMessage(_subtitles, CurrentSubtitle);
+                        await Messenger.Default.SendAsync(message);
+                        if (message.SelectedSubtitle != null &&
+                            message.SelectedSubtitle.LanguageName !=
+                            LocalizationProviderHelper.GetLocalizedValue<string>("NoneLabel") &&
+                            message.SelectedSubtitle.SubtitleId != "custom")
                         {
-                            IsSubtitleChosen = true;
+                            OnResumedMedia(new EventArgs());
+                            if (CurrentSubtitle != null &&
+                                CurrentSubtitle.SubtitleId == message.SelectedSubtitle.SubtitleId)
+                            {
+                                IsSubtitleChosen = true;
+                            }
+                            else
+                            {
+                                var path = Path.Combine(_cacheService.Subtitles + message.SelectedSubtitle.ImdbId);
+                                Directory.CreateDirectory(path);
+                                var subtitlePath = await
+                                    _subtitlesService.DownloadSubtitleToPath(path,
+                                        message.SelectedSubtitle);
+                                OnSubtitleChosen(new SubtitleChangedEventArgs(subtitlePath,
+                                    message.SelectedSubtitle));
+                                IsSubtitleChosen = true;
+                            }
                         }
-                        else
+                        else if (message.SelectedSubtitle != null &&
+                                 message.SelectedSubtitle.LanguageName !=
+                                 LocalizationProviderHelper.GetLocalizedValue<string>("NoneLabel") &&
+                                 message.SelectedSubtitle.SubtitleId == "custom")
                         {
-                            var path = Path.Combine(_cacheService.Subtitles + message.SelectedSubtitle.ImdbId);
-                            Directory.CreateDirectory(path);
-                            var subtitlePath = await
-                                _subtitlesService.DownloadSubtitleToPath(path,
-                                    message.SelectedSubtitle);
-                            OnSubtitleChosen(new SubtitleChangedEventArgs(subtitlePath, message.SelectedSubtitle));
-                            IsSubtitleChosen = true;
+                            var subMessage = new ShowCustomSubtitleMessage();
+                            await Messenger.Default.SendAsync(subMessage);
+                            if (!subMessage.Error && !string.IsNullOrEmpty(subMessage.FileName))
+                            {
+                                OnSubtitleChosen(
+                                    new SubtitleChangedEventArgs(subMessage.FileName, message.SelectedSubtitle));
+                                IsSubtitleChosen = true;
+                            }
+                            else
+                            {
+                                IsSubtitleChosen = false;
+                            }
+
+                            OnResumedMedia(new EventArgs());
                         }
-                    }
-                    else if (message.SelectedSubtitle != null &&
-                             message.SelectedSubtitle.LanguageName !=
-                             LocalizationProviderHelper.GetLocalizedValue<string>("NoneLabel") &&
-                             message.SelectedSubtitle.SubtitleId == "custom")
-                    {
-                        var subMessage = new CustomSubtitleMessage();
-                        await Messenger.Default.SendAsync(subMessage);
-                        if (!subMessage.Error && !string.IsNullOrEmpty(subMessage.FileName))
+                        else if (message.SelectedSubtitle != null && message.SelectedSubtitle.LanguageName ==
+                                 LocalizationProviderHelper.GetLocalizedValue<string>("NoneLabel"))
                         {
-                            OnSubtitleChosen(
-                                new SubtitleChangedEventArgs(subMessage.FileName, message.SelectedSubtitle));
-                            IsSubtitleChosen = true;
-                        }
-                        else
-                        {
+                            OnSubtitleChosen(new SubtitleChangedEventArgs(string.Empty, message.SelectedSubtitle));
+                            OnResumedMedia(new EventArgs());
                             IsSubtitleChosen = false;
                         }
-
-                        OnResumedMedia(new EventArgs());
+                        else
+                        {
+                            OnResumedMedia(new EventArgs());
+                            IsSubtitleChosen = previousSubtitleChosen;
+                        }
                     }
-                    else if (message.SelectedSubtitle != null && message.SelectedSubtitle.LanguageName ==
-                             LocalizationProviderHelper.GetLocalizedValue<string>("NoneLabel"))
+                    catch (Exception ex)
                     {
-                        OnSubtitleChosen(new SubtitleChangedEventArgs(string.Empty, message.SelectedSubtitle));
-                        OnResumedMedia(new EventArgs());
-                        IsSubtitleChosen = false;
-                    }
-                    else
-                    {
-                        OnResumedMedia(new EventArgs());
                         IsSubtitleChosen = previousSubtitleChosen;
+                        OnResumedMedia(new EventArgs());
+                        Logger.Trace(ex);
                     }
-                }
-                catch (Exception ex)
-                {
-                    IsSubtitleChosen = previousSubtitleChosen;
-                    Logger.Trace(ex);
                 }
             });
 
@@ -444,7 +466,7 @@ namespace Popcorn.ViewModels.Pages.Player
                         IsCasting = false;
                         OnPausedMedia(new EventArgs());
                         var message =
-                            new CastMediaMessage {CastCancellationTokenSource = new CancellationTokenSource()};
+                            new ShowCastMediaMessage {CastCancellationTokenSource = new CancellationTokenSource()};
                         message.StartCast = async chromecastReseiver =>
                         {
                             await LoadCastAsync(message.CloseCastDialog);
@@ -488,7 +510,7 @@ namespace Popcorn.ViewModels.Pages.Player
             }
         }
 
-        public async Task SetVolume(float volume)
+        private async Task SetVolume(float volume)
         {
             try
             {
@@ -500,18 +522,6 @@ namespace Popcorn.ViewModels.Pages.Player
             }
         }
 
-        private string GetLocalIpAddress()
-        {
-            string localIp;
-            using (Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, 0))
-            {
-                socket.Connect("8.8.8.8", 65530);
-                IPEndPoint endPoint = socket.LocalEndPoint as IPEndPoint;
-                localIp = endPoint.Address.ToString();
-            }
-            return localIp;
-        }
-
         private async Task LoadCastAsync(Action closeCastDialog)
         {
             var isRemote = Uri.TryCreate(MediaPath, UriKind.Absolute, out var uriResult)
@@ -519,7 +529,7 @@ namespace Popcorn.ViewModels.Pages.Player
 
             var videoPath = MediaPath.Split(new[] {"Popcorn\\"}, StringSplitOptions.RemoveEmptyEntries).Last()?
                 .Replace("\\", "/");
-            var mediaPath = $"http://{GetLocalIpAddress()}:9900/{videoPath}";
+            var mediaPath = $"http://{Helper.GetLocalIpAddress()}:{Constants.ServerPort}/{videoPath}";
             var subtitle = SubtitleFilePath;
             if (!string.IsNullOrEmpty(subtitle))
             {
@@ -528,7 +538,7 @@ namespace Popcorn.ViewModels.Pages.Player
                 {
                     subtitle = subtitle.Split(new[] {"Popcorn\\"}, StringSplitOptions.RemoveEmptyEntries).Last()?
                         .Replace("\\", "/");
-                    subtitle = $"http://{GetLocalIpAddress()}:9900/{subtitle}";
+                    subtitle = $"http://{Helper.GetLocalIpAddress()}:{Constants.ServerPort}/{subtitle}";
                 }
             }
 
@@ -536,16 +546,23 @@ namespace Popcorn.ViewModels.Pages.Player
             {
                 ContentId = isRemote ? MediaPath : mediaPath,
                 ContentType = "video/mp4",
+                
                 Metadata = new MovieMetadata
                 {
-                    Title = MediaName,
-                    SubTitle = !string.IsNullOrEmpty(subtitle) ? subtitle : null
+                    Title = MediaName
                 }
             };
 
+            if (!string.IsNullOrEmpty(subtitle))
+            {
+                media.Tracks = new[]
+                {
+                    new Track {TrackId = 1, Language = "en-US", Name = "English", TrackContentId = subtitle}
+                };
+            }
             try
             {
-                await _chromecastService.LoadAsync(media);
+                await _chromecastService.LoadAsync(media, (!string.IsNullOrEmpty(subtitle), 1));
                 closeCastDialog.Invoke();
                 OnCastStarted(new EventArgs());
             }
@@ -565,45 +582,45 @@ namespace Popcorn.ViewModels.Pages.Player
 
         public ICommand PlayCastCommand
         {
-            get { return _playCastCommand; }
-            set { Set(ref _playCastCommand, value); }
+            get => _playCastCommand;
+            private set => Set(ref _playCastCommand, value);
         }
 
         public ICommand PauseCastCommand
         {
-            get { return _pauseCastCommand; }
-            set { Set(ref _pauseCastCommand, value); }
+            get => _pauseCastCommand;
+            private set => Set(ref _pauseCastCommand, value);
         }
 
         public ICommand SeekCastCommand
         {
-            get { return _seekCastCommand; }
-            set { Set(ref _seekCastCommand, value); }
+            get => _seekCastCommand;
+            private set => Set(ref _seekCastCommand, value);
         }
 
         public ICommand StopCastCommand
         {
-            get { return _stopCastCommand; }
-            set { Set(ref _stopCastCommand, value); }
+            get => _stopCastCommand;
+            private set => Set(ref _stopCastCommand, value);
         }
 
         public OSDB.Subtitle CurrentSubtitle
         {
-            get { return _currentSubtitle; }
-            set { Set(ref _currentSubtitle, value); }
+            get => _currentSubtitle;
+            set => Set(ref _currentSubtitle, value);
         }
 
         public bool IsSubtitleChosen
         {
-            get { return _isSubtitleChosen; }
-            set { Set(ref _isSubtitleChosen, value); }
+            get => _isSubtitleChosen;
+            set => Set(ref _isSubtitleChosen, value);
         }
 
         public double MediaLength { get; set; }
 
         public double PlayerTime
         {
-            get { return _playerTime; }
+            get => _playerTime;
             set
             {
                 Set(ref _playerTime, value);
@@ -613,8 +630,24 @@ namespace Popcorn.ViewModels.Pages.Player
 
         public IReceiver ChromecastReceiver
         {
-            get { return _chromecastReceiver; }
-            set { Set(ref _chromecastReceiver, value); }
+            get => _chromecastReceiver;
+            set => Set(ref _chromecastReceiver, value);
+        }
+
+        public double Volume
+        {
+            get => _volume;
+            set
+            {
+                Set(ref _volume, value);
+                if (IsCasting)
+                {
+                    Task.Run(async () =>
+                    {
+                        await SetVolume(Convert.ToSingle(value));
+                    });
+                }
+            }
         }
 
         /// <summary>

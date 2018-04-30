@@ -10,10 +10,14 @@ using Akavache;
 using GalaSoft.MvvmLight.Ioc;
 using GalaSoft.MvvmLight.Threading;
 using Ignite.SharpNetSH;
+using Microsoft.ApplicationInsights;
+using Microsoft.ApplicationInsights.Extensibility;
+using Microsoft.ApplicationInsights.WindowsServer.TelemetryChannel.Implementation;
 using Microsoft.Owin.Hosting;
 using NetFwTypeLib;
 using NLog;
 using Popcorn.Helpers;
+using Popcorn.Initializers;
 using Popcorn.Services.Server;
 using Popcorn.Services.User;
 using Popcorn.Utils;
@@ -77,43 +81,51 @@ namespace Popcorn
         /// <param name="e"></param>
         protected override async void OnStartup(StartupEventArgs e)
         {
+            TelemetryConfiguration.Active.TelemetryInitializers.Add(new PopcornApplicationInsightsInitializer());
+            var builder = TelemetryConfiguration.Active.TelemetryProcessorChainBuilder;
+            builder.UseAdaptiveSampling(1);
+            builder.Build();
+            await ApplicationInsightsHelper.Initialize();
             base.OnStartup(e);
             WatchStart = Stopwatch.StartNew();
             Logger.Info(
                 "Popcorn starting...");
-            AsyncSynchronizationContext.Register();
+            Unosquare.FFME.MediaElement.FFmpegDirectory = Constants.FFmpegPath;
 
             try
             {
                 var userService = SimpleIoc.Default.GetInstance<IUserService>();
                 await userService.GetUser();
-                var netsh = new NetSH(new Utils.CommandLineHarness());
-                var showResponse = netsh.Http.Show.UrlAcl(Constants.ServerUrl);
-                if (showResponse.ResponseObject.Count == 0)
+                await Task.Run(async () =>
                 {
-                    if (!Helper.IsAdministrator())
+                    var netsh = new NetSH(new Utils.CommandLineHarness());
+                    var showResponse = netsh.Http.Show.UrlAcl(Constants.ServerUrl);
+                    if (showResponse.ResponseObject.Count == 0)
                     {
-                        RestartAsAdmin();
+                        if (!Helper.IsAdministrator())
+                        {
+                            RestartAsAdmin();
+                        }
+                        else
+                        {
+                            RegisterUrlAcl();
+                        }
                     }
-                    else
-                    {
-                        RegisterUrlAcl();
-                    }
-                }
 
-                if (!FirewallRuleExists("Popcorn Server"))
-                {
-                    if (!Helper.IsAdministrator())
+                    if (!await FirewallRuleExists("Popcorn Server"))
                     {
-                        RestartAsAdmin();
+                        if (!Helper.IsAdministrator())
+                        {
+                            RestartAsAdmin();
+                        }
+                        else
+                        {
+                            await RegisterFirewallRule();
+                        }
                     }
-                    else
-                    {
-                        RegisterFirewallRule();
-                    }
-                }
 
-                _localServer = WebApp.Start<Startup>(Constants.ServerUrl);
+                    _localServer = WebApp.Start<Startup>(Constants.ServerUrl);
+                });
             }
             catch (Exception ex)
             {
@@ -123,73 +135,91 @@ namespace Popcorn
 
         private static void RestartAsAdmin()
         {
-            var args = string.Empty;
-            var cmd = Environment.GetCommandLineArgs();
-            if (cmd.Any())
+            DispatcherHelper.CheckBeginInvokeOnUI(() =>
             {
-                args = string.Join(" ", cmd);
-            }
-
-            var info = new ProcessStartInfo(
-                Assembly.GetEntryAssembly().Location)
-            {
-                Verb = "runas",
-                Arguments = args
-            };
-
-            var process = new Process
-            {
-                StartInfo = info
-            };
-
-            process.Start();
-            Current.Shutdown();
-        }
-
-        private bool FirewallRuleExists(string ruleName)
-        {
-            try
-            {
-                Type tNetFwPolicy2 = Type.GetTypeFromProgID("HNetCfg.FwPolicy2");
-                INetFwPolicy2 fwPolicy2 = (INetFwPolicy2) Activator.CreateInstance(tNetFwPolicy2);
-                foreach (INetFwRule rule in fwPolicy2.Rules)
+                var args = string.Empty;
+                var cmd = Environment.GetCommandLineArgs();
+                if (cmd.Any())
                 {
-                    if (rule.Name.IndexOf(ruleName, StringComparison.Ordinal) != -1)
-                    {
-                        return true;
-                    }
+                    args = string.Join(" ", cmd);
                 }
-            }
-            catch (Exception ex)
-            {
-                Logger.Error(ex);
-            }
 
-            return false;
+                var info = new ProcessStartInfo(
+                    Assembly.GetEntryAssembly().Location)
+                {
+                    Verb = "runas",
+                    Arguments = args
+                };
+
+                var process = new Process
+                {
+                    StartInfo = info
+                };
+
+                process.Start();
+                Current.Shutdown();
+            });
         }
 
-        private static void RegisterFirewallRule()
+        private async Task<bool> FirewallRuleExists(string ruleName)
         {
-            try
+            var tcs = new TaskCompletionSource<bool>();
+            await Task.Run(() =>
             {
-                INetFwRule firewallRule = (INetFwRule)Activator.CreateInstance(
-                    Type.GetTypeFromProgID("HNetCfg.FWRule"));
-                firewallRule.Action = NET_FW_ACTION_.NET_FW_ACTION_ALLOW;
-                firewallRule.Description = "Enables Popcorn server.";
-                firewallRule.Direction = NET_FW_RULE_DIRECTION_.NET_FW_RULE_DIR_IN;
-                firewallRule.Enabled = true;
-                firewallRule.InterfaceTypes = "All";
-                firewallRule.Name = "Popcorn Server";
-                firewallRule.Protocol = (int)NET_FW_IP_PROTOCOL_.NET_FW_IP_PROTOCOL_TCP;
-                firewallRule.LocalPorts = "9900";
-                INetFwPolicy2 firewallPolicy = (INetFwPolicy2)Activator.CreateInstance(
-                    Type.GetTypeFromProgID("HNetCfg.FwPolicy2"));
-                firewallPolicy.Rules.Add(firewallRule);
-            }
-            catch (Exception ex)
+                try
+                {
+                    Type tNetFwPolicy2 = Type.GetTypeFromProgID("HNetCfg.FwPolicy2");
+                    INetFwPolicy2 fwPolicy2 = (INetFwPolicy2) Activator.CreateInstance(tNetFwPolicy2);
+                    foreach (INetFwRule rule in fwPolicy2.Rules)
+                    {
+                        if (rule.Name.IndexOf(ruleName, StringComparison.Ordinal) != -1)
+                        {
+                            tcs.TrySetResult(true);
+                        }
+                    }
+
+                    tcs.TrySetResult(false);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex);
+                    tcs.TrySetResult(false);
+                }
+            });
+
+            return await tcs.Task;
+        }
+
+        private static async Task<bool> RegisterFirewallRule()
+        {
+            var tcs = new TaskCompletionSource<bool>();
+            await Task.Run(() =>
             {
-                Logger.Error(ex);
-            }
+                try
+                {
+                    INetFwRule firewallRule = (INetFwRule) Activator.CreateInstance(
+                        Type.GetTypeFromProgID("HNetCfg.FWRule"));
+                    firewallRule.Action = NET_FW_ACTION_.NET_FW_ACTION_ALLOW;
+                    firewallRule.Description = "Enables Popcorn server.";
+                    firewallRule.Direction = NET_FW_RULE_DIRECTION_.NET_FW_RULE_DIR_IN;
+                    firewallRule.Enabled = true;
+                    firewallRule.InterfaceTypes = "All";
+                    firewallRule.Name = "Popcorn Server";
+                    firewallRule.Protocol = (int) NET_FW_IP_PROTOCOL_.NET_FW_IP_PROTOCOL_TCP;
+                    firewallRule.LocalPorts = Constants.ServerPort.ToString();
+                    INetFwPolicy2 firewallPolicy = (INetFwPolicy2) Activator.CreateInstance(
+                        Type.GetTypeFromProgID("HNetCfg.FwPolicy2"));
+                    firewallPolicy.Rules.Add(firewallRule);
+                    tcs.TrySetResult(true);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex);
+                    tcs.TrySetResult(false);
+                }
+            });
+
+            return await tcs.Task;
         }
 
         private static void RegisterUrlAcl()

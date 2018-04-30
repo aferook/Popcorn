@@ -6,6 +6,8 @@ using Popcorn.Models.Shows;
 using Popcorn.Services.Shows.Show;
 using Popcorn.Utils.Exceptions;
 using System;
+using System.Net;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Polly;
@@ -64,7 +66,54 @@ namespace Popcorn.Services.Shows.Trailer
 
                         if (!ct.IsCancellationRequested)
                         {
-                            Logger.Debug(
+                            Uri uriResult;
+                            bool result = Uri.TryCreate(trailer, UriKind.Absolute, out uriResult)
+                                          && (uriResult.Scheme == Uri.UriSchemeHttp || uriResult.Scheme == Uri.UriSchemeHttps);
+                            if (result)
+                            {
+                                var client = new HttpClient();
+                                try
+                                {
+                                    using (var response = await client.GetAsync(uriResult, HttpCompletionOption.ResponseHeadersRead,ct))
+                                    {
+                                        if (response == null || response.StatusCode != HttpStatusCode.OK)
+                                        {
+                                            Logger.Error(
+                                                $"Failed loading show's trailer: {show.Title}");
+                                            Messenger.Default.Send(
+                                                new ManageExceptionMessage(
+                                                    new TrailerNotAvailableException(
+                                                        LocalizationProviderHelper.GetLocalizedValue<string>("TrailerNotAvailable"))));
+                                            Messenger.Default.Send(new StopPlayingTrailerMessage(Utils.MediaType.Show));
+                                            return;
+                                        }
+                                    }
+                                }
+                                catch (WebException)
+                                {
+                                    Logger.Error(
+                                        $"Failed loading show's trailer: {show.Title}");
+                                    Messenger.Default.Send(
+                                        new ManageExceptionMessage(
+                                            new TrailerNotAvailableException(
+                                                LocalizationProviderHelper.GetLocalizedValue<string>("TrailerNotAvailable"))));
+                                    Messenger.Default.Send(new StopPlayingTrailerMessage(Utils.MediaType.Show));
+                                    return;
+                                }
+                            }
+                            else
+                            {
+                                Logger.Error(
+                                    $"Failed loading show's trailer: {show.Title}");
+                                Messenger.Default.Send(
+                                    new ManageExceptionMessage(
+                                        new TrailerNotAvailableException(
+                                            LocalizationProviderHelper.GetLocalizedValue<string>("TrailerNotAvailable"))));
+                                Messenger.Default.Send(new StopPlayingTrailerMessage(Utils.MediaType.Show));
+                                return;
+                            }
+
+                            Logger.Info(
                                 $"Show's trailer loaded: {show.Title}");
                             Messenger.Default.Send(new PlayTrailerMessage(trailer, show.Title, () =>
                                 {
@@ -93,7 +142,7 @@ namespace Popcorn.Services.Shows.Trailer
                                         "TrailerNotAvailable"))));
                         Messenger.Default.Send(new StopPlayingTrailerMessage(Utils.MediaType.Show));
                     }
-                }, ct).ConfigureAwait(false);
+                }, ct);
             }
             catch (Exception ex)
             {

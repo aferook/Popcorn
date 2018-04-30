@@ -3,9 +3,12 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
+using System.Text;
 using System.Threading.Tasks;
 using CookComputing.XmlRpc;
+using NChardet;
 using Popcorn.OSDB.Backend;
 using Popcorn.OSDB.Utils;
 
@@ -22,18 +25,29 @@ namespace Popcorn.OSDB
             Proxy = proxy;
         }
 
-        internal void Login(string username, string password, string language, string userAgent)
+        internal async Task Login(string username, string password, string language, string userAgent)
         {
-            try
+            var tcs = new TaskCompletionSource<bool>();
+            await Task.Run(() =>
             {
-                var response = Proxy.Login(username, password, language, userAgent);
-                VerifyResponseCode(response);
-                Token = response.token;
-            }
-            catch (Exception) { }
+                try
+                {
+                    var response = Proxy.Login(username, password, language, userAgent);
+                    VerifyResponseCode(response);
+                    Token = response.token;
+                    tcs.TrySetResult(true);
+                }
+                catch (Exception ex)
+                {
+                    tcs.TrySetException(ex);
+                }
+            }).ConfigureAwait(false);
+
+            await tcs.Task.ConfigureAwait(false);
         }
 
-        public Task<IList<Subtitle>> SearchSubtitlesFromImdb(string languages, string imdbId, int? season, int? episode)
+        public async Task<IList<Subtitle>> SearchSubtitlesFromImdb(string languages, string imdbId, int? season,
+            int? episode)
         {
             if (string.IsNullOrEmpty(imdbId))
             {
@@ -48,160 +62,388 @@ namespace Popcorn.OSDB
                 season = season
             };
 
-            return SearchSubtitlesInternal(request);
+            return await SearchSubtitlesInternal(request);
         }
 
-        private Task<IList<Subtitle>> SearchSubtitlesInternal(SearchSubtitlesRequest request)
+        public async Task<IList<Subtitle>> SearchSubtitlesFromFile(string languages, string filename)
         {
-            var tcs = new TaskCompletionSource<IList<Subtitle>>();
-            try
+            if (string.IsNullOrEmpty(filename))
             {
-                var response = Proxy.SearchSubtitles(Token, new[] {request});
-                VerifyResponseCode(response);
+                throw new ArgumentNullException(nameof(filename));
+            }
 
-                var subtitles = new List<Subtitle>();
-                var subtitlesInfo = response.data as object[];
-                if (null != subtitlesInfo)
+            var file = new FileInfo(filename);
+            if (!file.Exists)
+            {
+                throw new ArgumentException("File doesn't exist", nameof(filename));
+            }
+            var request = new SearchSubtitlesRequest
+            {
+                sublanguageid = languages,
+                moviehash = HashHelper.ToHexadecimal(HashHelper.ComputeMovieHash(filename)),
+                moviebytesize = file.Length.ToString(),
+                imdbid = string.Empty,
+                query = string.Empty
+            };
+
+
+            return await SearchSubtitlesInternal(request);
+        }
+
+        public async Task<IList<Subtitle>> SearchSubtitlesFromImdb(string languages, string imdbId)
+        {
+            if (string.IsNullOrEmpty(imdbId))
+            {
+                throw new ArgumentNullException(nameof(imdbId));
+            }
+            var request = new SearchSubtitlesRequest
+            {
+                sublanguageid = languages,
+                imdbid = imdbId
+            };
+
+            return await SearchSubtitlesInternal(request);
+        }
+
+        public async Task<IList<Subtitle>> SearchSubtitlesFromQuery(string languages, string query, int? season = null,
+            int? episode = null)
+        {
+            if (string.IsNullOrEmpty(query))
+            {
+                throw new ArgumentNullException(nameof(query));
+            }
+            var request = new SearchSubtitlesRequest
+            {
+                sublanguageid = languages,
+                query = query,
+                season = season,
+                episode = episode
+            };
+
+            return await SearchSubtitlesInternal(request);
+        }
+
+        public async Task<long> CheckSubHash(string subHash)
+        {
+            var tcs = new TaskCompletionSource<long>();
+            await Task.Run(() =>
+            {
+                try
                 {
-                    foreach (var infoObject in subtitlesInfo)
+                    var response = Proxy.CheckSubHash(Token, new[] { subHash });
+                    VerifyResponseCode(response);
+
+                    long idSubtitleFile = 0;
+                    var hashInfo = response.data as XmlRpcStruct;
+                    if (hashInfo != null && hashInfo.ContainsKey(subHash))
                     {
-                        var subInfo = SimpleObjectMapper.MapToObject<SearchSubtitlesInfo>((XmlRpcStruct) infoObject);
-                        subtitles.Add(BuildSubtitleObject(subInfo));
+                        idSubtitleFile = Convert.ToInt64(hashInfo[subHash]);
                     }
+
+                    tcs.TrySetResult(idSubtitleFile);
                 }
-                tcs.TrySetResult(subtitles);
-            }
-            catch (Exception ex)
-            {
-                tcs.TrySetException(ex);
-            }
+                catch (Exception ex)
+                {
+                    tcs.TrySetException(ex);
+                }
+            }).ConfigureAwait(false);
 
-            return tcs.Task;
+            return await tcs.Task.ConfigureAwait(false);
         }
 
-        public Task<string> DownloadSubtitleToPath(string path, Subtitle subtitle)
+        public async Task<IEnumerable<MovieInfo>> CheckMovieHash(string moviehash)
         {
-            return DownloadSubtitleToPath(path, subtitle, null);
+            var tcs = new TaskCompletionSource<IEnumerable<MovieInfo>>();
+            await Task.Run(() =>
+            {
+                try
+                {
+                    var response = Proxy.CheckMovieHash(Token, new[] { moviehash });
+                    VerifyResponseCode(response);
+
+                    var movieInfoList = new List<MovieInfo>();
+
+                    var hashInfo = response.data as XmlRpcStruct;
+                    if (hashInfo != null && hashInfo.ContainsKey(moviehash))
+                    {
+                        var movieInfoArray = hashInfo[moviehash] as object[];
+                        if (movieInfoArray != null)
+                        {
+                            foreach (XmlRpcStruct movieInfoStruct in movieInfoArray)
+                            {
+                                var movieInfo = SimpleObjectMapper.MapToObject<CheckMovieHashInfo>(movieInfoStruct);
+                                movieInfoList.Add(BuildMovieInfoObject(movieInfo));
+                            }
+                        }
+                    }
+
+                    tcs.TrySetResult(movieInfoList);
+                }
+                catch (Exception ex)
+                {
+                    tcs.TrySetException(ex);
+                }
+            }).ConfigureAwait(false);
+
+            return await tcs.Task.ConfigureAwait(false);
         }
 
-        private async Task<string> DownloadSubtitleToPath(string path, Subtitle subtitle, string newSubtitleName)
+        public async Task<IEnumerable<Language>> GetSubLanguages(string language)
         {
-            if (string.IsNullOrEmpty(path))
+            var tcs = new TaskCompletionSource<IEnumerable<Language>>();
+            await Task.Run(() =>
             {
-                throw new ArgumentNullException(nameof(path));
-            }
-            if (null == subtitle)
-            {
-                throw new ArgumentNullException(nameof(subtitle));
-            }
-            if (!Directory.Exists(path))
-            {
-                throw new ArgumentException("path should point to a valid location");
-            }
+                try
+                {
+                    var response = Proxy.GetSubLanguages(language);
+                    VerifyResponseCode(response);
 
+                    IList<Language> languages = new List<Language>();
+                    foreach (var languageInfo in response.data)
+                    {
+                        languages.Add(BuildLanguageObject(languageInfo));
+                    }
+
+                    tcs.TrySetResult(languages);
+                }
+                catch (Exception ex)
+                {
+                    tcs.TrySetException(ex);
+                }
+            }).ConfigureAwait(false);
+
+            return await tcs.Task.ConfigureAwait(false);
+        }
+
+        public async Task<IEnumerable<Movie>> SearchMoviesOnImdb(string query)
+        {
+            var tcs = new TaskCompletionSource<IEnumerable<Movie>>();
+            await Task.Run(() =>
+            {
+                try
+                {
+                    var response = Proxy.SearchMoviesOnIMDB(Token, query);
+                    VerifyResponseCode(response);
+
+                    IList<Movie> movies = new List<Movie>();
+
+                    if (response.data.Length == 1 && string.IsNullOrEmpty(response.data.First().id))
+                    {
+                        // no match found
+                        tcs.TrySetResult(movies);
+                        return;
+                    }
+
+                    foreach (var movieInfo in response.data)
+                    {
+                        movies.Add(BuildMovieObject(movieInfo));
+                    }
+
+                    tcs.TrySetResult(movies);
+                }
+                catch (Exception ex)
+                {
+                    tcs.TrySetException(ex);
+                }
+            }).ConfigureAwait(false);
+
+            return await tcs.Task.ConfigureAwait(false);
+        }
+
+        public async Task<MovieDetails> GetImdbMovieDetails(string imdbId)
+        {
+            var tcs = new TaskCompletionSource<MovieDetails>();
+            await Task.Run(() =>
+            {
+                try
+                {
+                    var response = Proxy.GetIMDBMovieDetails(Token, imdbId);
+                    VerifyResponseCode(response);
+
+                    var movieDetails = BuildMovieDetailsObject(response.data);
+                    tcs.TrySetResult(movieDetails);
+                }
+                catch (Exception ex)
+                {
+                    tcs.TrySetException(ex);
+                }
+            }).ConfigureAwait(false);
+
+            return await tcs.Task.ConfigureAwait(false);
+        }
+
+        public async Task NoOperation()
+        {
+            await Task.Run(() =>
+            {
+                var response = Proxy.NoOperation(Token);
+                VerifyResponseCode(response);
+            }).ConfigureAwait(false);
+        }
+
+        public async Task<IEnumerable<UserComment>> GetComments(string idsubtitle)
+        {
+            var tcs = new TaskCompletionSource<IEnumerable<UserComment>>();
+            await Task.Run(() =>
+            {
+                try
+                {
+                    var response = Proxy.GetComments(Token, new[] { idsubtitle });
+                    VerifyResponseCode(response);
+
+                    var comments = new List<UserComment>();
+                    var commentsStruct = response.data as XmlRpcStruct;
+                    if (commentsStruct == null)
+                    {
+                        tcs.TrySetResult(comments);
+                        return;
+                    }
+
+                    if (commentsStruct.ContainsKey("_" + idsubtitle))
+                    {
+                        var commentsList = commentsStruct["_" + idsubtitle] as object[];
+                        if (commentsList != null)
+                        {
+                            foreach (XmlRpcStruct commentStruct in commentsList)
+                            {
+                                var comment = SimpleObjectMapper.MapToObject<CommentsData>(commentStruct);
+                                comments.Add(BuildUserCommentObject(comment));
+                            }
+                        }
+                    }
+
+                    tcs.TrySetResult(comments);
+                }
+                catch (Exception ex)
+                {
+                    tcs.TrySetException(ex);
+                }
+            }).ConfigureAwait(false);
+
+            return await tcs.Task.ConfigureAwait(false);
+        }
+
+        public async Task<string> DetectLanguge(string data)
+        {
+            var tcs = new TaskCompletionSource<string>();
+            await Task.Run(() =>
+            {
+                try
+                {
+                    var bytes = GzipString(data);
+                    var text = Convert.ToBase64String(bytes);
+
+                    var response = Proxy.DetectLanguage(Token, new[] { text });
+                    VerifyResponseCode(response);
+
+                    var languagesStruct = response.data as XmlRpcStruct;
+                    if (languagesStruct == null)
+                    {
+                        tcs.TrySetResult(null);
+                        return;
+                    }
+
+                    foreach (string key in languagesStruct.Keys)
+                    {
+                        tcs.TrySetResult(languagesStruct[key].ToString());
+                        return;
+                    }
+
+                    tcs.TrySetResult(null);
+                }
+                catch (Exception ex)
+                {
+                    tcs.TrySetException(ex);
+                }
+            }).ConfigureAwait(false);
+
+            return await tcs.Task.ConfigureAwait(false);
+        }
+
+        public async Task ReportWrongMovieHash(string idSubMovieFile)
+        {
+            await Task.Run(() =>
+            {
+                var response = Proxy.ReportWrongMovieHash(Token, idSubMovieFile);
+                VerifyResponseCode(response);
+            }).ConfigureAwait(false);
+        }
+
+        public async Task<string> DownloadSubtitleToPath(string path, Subtitle subtitle, bool remote = true)
+        {
+            return await DownloadSubtitleToPath(path, subtitle, null, remote);
+        }
+
+        public async Task<string> DownloadSubtitleToPath(string path, Subtitle subtitle, string newSubtitleName,
+            bool remote = true)
+        {
             var destinationfile = Path.Combine(path,
-                (string.IsNullOrEmpty(newSubtitleName)) ? subtitle.SubtitleFileName : newSubtitleName);
-
-            if (File.Exists(destinationfile))
+                string.IsNullOrEmpty(newSubtitleName) ? subtitle.SubtitleFileName : newSubtitleName);
+            if (remote)
             {
-                //if file has been downloaded before - there is no need to download it again
-                return destinationfile;
-            }
+                if (string.IsNullOrEmpty(path))
+                {
+                    throw new ArgumentNullException(nameof(path));
+                }
 
-            var tempZipName = Path.GetTempFileName();
-            try
-            {
+                if (!Directory.Exists(path))
+                {
+                    throw new ArgumentException("path should point to a valid location");
+                }
+
+                if (File.Exists(destinationfile))
+                {
+                    //if file has been downloaded before - there is no need to download it again
+                    return destinationfile;
+                }
+
                 using (var client = new HttpClient())
                 {
-                    using (var response = await client.GetAsync(subtitle.SubTitleDownloadLink))
+                    using (var response = await client.GetAsync(subtitle.SubTitleDownloadLink).ConfigureAwait(false))
                     {
                         response.EnsureSuccessStatusCode();
                         using (var content = response.Content)
                         {
-                            await content.ReadAsFileAsync(tempZipName, true);
+                            var bytes = await content.ReadAsByteArrayAsync().ConfigureAwait(false);
+                            var decompressed = await UnZipSubtitleFileToFile(bytes).ConfigureAwait(false);
+                            await DecodeAndWriteFile(destinationfile, decompressed)
+                                .ConfigureAwait(false);
                         }
                     }
                 }
-
-                UnZipSubtitleFileToFile(tempZipName, destinationfile);
-
             }
-            finally
+            else
             {
-                File.Delete(tempZipName);
+                await DecodeAndWriteFile(destinationfile,
+                    File.ReadAllBytes(subtitle.SubTitleDownloadLink.AbsolutePath)).ConfigureAwait(false);
             }
 
             return destinationfile;
         }
 
-        public Task<IEnumerable<Language>> GetSubLanguages()
+        public async Task<IEnumerable<Language>> GetSubLanguages()
         {
             //get system language
-            return GetSubLanguages("en");
+            return await GetSubLanguages("en");
         }
 
-        private Task<IEnumerable<Language>> GetSubLanguages(string language)
+        private static byte[] GzipString(string str)
         {
-            var tcs = new TaskCompletionSource<IEnumerable<Language>>();
-            try
+            var bytes = Encoding.UTF8.GetBytes(str);
+
+            using (var msi = new MemoryStream(bytes))
+            using (var mso = new MemoryStream())
             {
-                var response = Proxy.GetSubLanguages(language);
-                VerifyResponseCode(response);
-
-                IList<Language> languages = response.data.Select(languageInfo => BuildLanguageObject(languageInfo))
-                    .ToList();
-                tcs.TrySetResult(languages);
-            }
-            catch (Exception ex)
-            {
-                tcs.TrySetException(ex);
-            }
-
-            return tcs.Task;
-        }
-
-        public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-
-        protected virtual void Dispose(bool disposing)
-        {
-            if (!Disposed)
-            {
-                if (disposing && !string.IsNullOrEmpty(Token))
+                using (var gs = new GZipStream(mso, CompressionMode.Compress))
                 {
-                    try
-                    {
-                        Proxy.Logout(Token);
-                    }
-                    catch
-                    {
-                        //soak it. We don't want exception on disposing. It's better to let the session timeout.
-                    }
-                    Token = null;
+                    msi.CopyTo(gs);
                 }
-                Disposed = true;
+
+                return mso.ToArray();
             }
         }
 
-        ~AnonymousClient()
-        {
-            Dispose(false);
-        }
-
-        private void UnZipSubtitleFileToFile(string zipFileName, string subFileName)
-        {
-            using (FileStream subFile = File.OpenWrite(subFileName))
-            using (FileStream tempFile = File.OpenRead(zipFileName))
-            {
-                var gzip = new GZipStream(tempFile, CompressionMode.Decompress);
-                gzip.CopyTo(subFile);
-            }
-        }
-
-        private Subtitle BuildSubtitleObject(SearchSubtitlesInfo info)
+        private static Subtitle BuildSubtitleObject(SearchSubtitlesInfo info)
         {
             var sub = new Subtitle
             {
@@ -214,7 +456,7 @@ namespace Popcorn.OSDB
                 LanguageName = info.LanguageName,
                 Rating = info.SubRating,
                 Bad = info.SubBad,
-
+                ISO639 = info.ISO639,
                 ImdbId = info.IDMovieImdb,
                 MovieId = info.IDMovie,
                 MovieName = info.MovieName,
@@ -224,7 +466,20 @@ namespace Popcorn.OSDB
             return sub;
         }
 
-        private Language BuildLanguageObject(GetSubLanguagesInfo info)
+        private static MovieInfo BuildMovieInfoObject(CheckMovieHashInfo info)
+        {
+            var movieInfo = new MovieInfo
+            {
+                MovieHash = info.MovieHash,
+                MovieImdbID = info.MovieImdbID,
+                MovieYear = info.MovieYear,
+                MovieName = info.MovieName,
+                SeenCount = info.SeenCount
+            };
+            return movieInfo;
+        }
+
+        private static Language BuildLanguageObject(GetSubLanguagesInfo info)
         {
             var language = new Language
             {
@@ -235,7 +490,54 @@ namespace Popcorn.OSDB
             return language;
         }
 
-        private void VerifyResponseCode(ResponseBase response)
+        private static Movie BuildMovieObject(MoviesOnIMDBInfo info)
+        {
+            var movie = new Movie
+            {
+                Id = Convert.ToInt64(info.id),
+                Title = info.title
+            };
+            return movie;
+        }
+
+        private static MovieDetails BuildMovieDetailsObject(IMDBMovieDetails info)
+        {
+            var movie = new MovieDetails
+            {
+                Aka = info.aka,
+                Cast = SimpleObjectMapper.MapToDictionary(info.cast as XmlRpcStruct),
+                Cover = info.cover,
+                Id = info.id,
+                Rating = info.rating,
+                Title = info.title,
+                Votes = info.votes,
+                Year = info.year,
+                Country = info.country,
+                Directors = SimpleObjectMapper.MapToDictionary(info.directors as XmlRpcStruct),
+                Duration = info.duration,
+                Genres = info.genres,
+                Language = info.language,
+                Tagline = info.tagline,
+                Trivia = info.trivia,
+                Writers = SimpleObjectMapper.MapToDictionary(info.writers as XmlRpcStruct)
+            };
+            return movie;
+        }
+
+        private static UserComment BuildUserCommentObject(CommentsData info)
+        {
+            var comment = new UserComment
+            {
+                Comment = info.Comment,
+                Created = info.Created,
+                IDSubtitle = info.IDSubtitle,
+                UserID = info.UserID,
+                UserNickName = info.UserNickName
+            };
+            return comment;
+        }
+
+        private static void VerifyResponseCode(ResponseBase response)
         {
             if (null == response)
             {
@@ -252,6 +554,108 @@ namespace Popcorn.OSDB
             {
                 throw new OsdbException($"Unexpected error response {response.status}");
             }
+        }
+
+        private async Task<IList<Subtitle>> SearchSubtitlesInternal(SearchSubtitlesRequest request)
+        {
+            var tcs = new TaskCompletionSource<IList<Subtitle>>();
+            await Task.Run(() =>
+            {
+                try
+                {
+                    var response = Proxy.SearchSubtitles(Token, new[] { request });
+                    VerifyResponseCode(response);
+
+                    var subtitles = new List<Subtitle>();
+                    var subtitlesInfo = response.data as object[];
+                    if (subtitlesInfo != null)
+                    {
+                        foreach (var infoObject in subtitlesInfo)
+                        {
+                            var subInfo =
+                                SimpleObjectMapper.MapToObject<SearchSubtitlesInfo>((XmlRpcStruct)infoObject);
+                            subtitles.Add(BuildSubtitleObject(subInfo));
+                        }
+                    }
+                    tcs.TrySetResult(subtitles);
+                }
+                catch (Exception ex)
+                {
+                    tcs.TrySetException(ex);
+                }
+            }).ConfigureAwait(false);
+
+            return await tcs.Task.ConfigureAwait(false);
+        }
+
+
+        private async Task DecodeAndWriteFile(string destinationfile, byte[] decompressed)
+        {
+            using (var subFile = new StreamWriter(destinationfile, false, Encoding.UTF8))
+            {
+                var cdo = new CharsetDetectionObserver();
+                var detector = new Detector(6);
+                detector.Init(cdo);
+                detector.DoIt(decompressed, decompressed.Length, false);
+                detector.Done();
+                var probable = detector.getProbableCharsets().FirstOrDefault();
+                var enc = Encoding.GetEncoding(!string.IsNullOrEmpty(cdo.Charset)
+                    ? cdo.Charset
+                    : (string.IsNullOrEmpty(probable) ? "UTF-8" : probable));
+
+                var str = Encoding.Convert(enc, Encoding.UTF8, decompressed);
+                await subFile.WriteAsync(WebUtility.HtmlDecode(Encoding.UTF8.GetString(str))).ConfigureAwait(false);
+            }
+        }
+
+        private async Task<byte[]> UnZipSubtitleFileToFile(byte[] gzipStream)
+        {
+            using (var compressedMs = new MemoryStream(gzipStream))
+            {
+                using (var decompressedMs = new MemoryStream())
+                {
+                    using (var gzs = new BufferedStream(new GZipStream(compressedMs,
+                        CompressionMode.Decompress)))
+                    {
+                        await gzs.CopyToAsync(decompressedMs);
+                    }
+                    return decompressedMs.ToArray();
+                }
+            }
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!Disposed)
+            {
+                if (disposing && !string.IsNullOrEmpty(Token))
+                {
+                    Task.Run(() =>
+                    {
+                        try
+                        {
+                            Proxy.Logout(Token);
+                        }
+                        catch
+                        {
+                            //soak it. We don't want exception on disposing. It's better to let the session timeout.
+                        }
+                        Token = null;
+                    }).ConfigureAwait(false);
+                }
+                Disposed = true;
+            }
+        }
+
+        ~AnonymousClient()
+        {
+            Dispose(false);
         }
     }
 }

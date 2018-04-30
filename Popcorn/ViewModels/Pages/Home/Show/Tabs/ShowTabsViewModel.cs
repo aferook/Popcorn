@@ -6,7 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using GalaSoft.MvvmLight;
-using GalaSoft.MvvmLight.Command;
+using GalaSoft.MvvmLight.CommandWpf;
 using GalaSoft.MvvmLight.Messaging;
 using GalaSoft.MvvmLight.Threading;
 using NLog;
@@ -179,7 +179,7 @@ namespace Popcorn.ViewModels.Pages.Home.Show.Tabs
             get => _isLoadingShows;
             protected set { Set(() => IsLoadingShows, ref _isLoadingShows, value); }
         }
-        
+
         /// <summary>
         /// Vertical scroll offset
         /// </summary>
@@ -270,7 +270,7 @@ namespace Popcorn.ViewModels.Pages.Home.Show.Tabs
         /// </summary>
         public virtual async Task LoadShowsAsync(bool reset = false)
         {
-            await LoadingSemaphore.WaitAsync();
+            await LoadingSemaphore.WaitAsync(CancellationLoadingShows.Token);
             if (reset)
             {
                 Shows.Clear();
@@ -288,40 +288,34 @@ namespace Popcorn.ViewModels.Pages.Home.Show.Tabs
             }
 
             StopLoadingShows();
-            Logger.Info(
+            Logger.Trace(
                 $"Loading page {Page}...");
             HasLoadingFailed = false;
             try
             {
                 IsLoadingShows = true;
-                await Task.Run(async () =>
+                var getShowWatcher = new Stopwatch();
+                var result =
+                    await ShowService.GetShowsAsync(Page,
+                        MaxShowsPerPage,
+                        Rating * 10,
+                        SortBy,
+                        CancellationLoadingShows.Token,
+                        Genre);
+                getShowWatcher.Stop();
+                var getShowEllapsedTime = getShowWatcher.ElapsedMilliseconds;
+                if (reset && getShowEllapsedTime < 500)
                 {
-                    var getShowWatcher = new Stopwatch();
-                    var result =
-                        await ShowService.GetShowsAsync(Page,
-                            MaxShowsPerPage,
-                            Rating * 10,
-                            SortBy,
-                            CancellationLoadingShows.Token,
-                            Genre).ConfigureAwait(false);
-                    getShowWatcher.Stop();
-                    var getShowEllapsedTime = getShowWatcher.ElapsedMilliseconds;
-                    if (reset && getShowEllapsedTime < 500)
-                    {
-                        // Wait for VerticalOffset to reach 0 (animation lasts 500ms)
-                        await Task.Delay(500 - (int)getShowEllapsedTime).ConfigureAwait(false);
-                    }
+                    // Wait for VerticalOffset to reach 0 (animation lasts 500ms)
+                    await Task.Delay(500 - (int) getShowEllapsedTime);
+                }
 
-                    DispatcherHelper.CheckBeginInvokeOnUI(() =>
-                    {
-                        Shows.AddRange(result.shows.Except(Shows, new ShowLightComparer()));
-                        IsLoadingShows = false;
-                        IsShowFound = Shows.Any();
-                        CurrentNumberOfShows = Shows.Count;
-                        MaxNumberOfShows = result.nbShows == 0 ? Shows.Count : result.nbShows;
-                        UserService.SyncShowHistory(Shows);
-                    });
-                }).ConfigureAwait(false);
+                Shows.AddRange(result.shows.Except(Shows, new ShowLightComparer()));
+                IsLoadingShows = false;
+                IsShowFound = Shows.Any();
+                CurrentNumberOfShows = Shows.Count;
+                MaxNumberOfShows = result.nbShows == 0 ? Shows.Count : result.nbShows;
+                UserService.SyncShowHistory(Shows);
             }
             catch (Exception exception)
             {
@@ -335,7 +329,7 @@ namespace Popcorn.ViewModels.Pages.Home.Show.Tabs
             {
                 watch.Stop();
                 var elapsedMs = watch.ElapsedMilliseconds;
-                Logger.Info(
+                Logger.Trace(
                     $"Loaded page {Page} in {elapsedMs} milliseconds.");
                 LoadingSemaphore.Release();
             }
@@ -367,9 +361,13 @@ namespace Popcorn.ViewModels.Pages.Home.Show.Tabs
         {
             Messenger.Default.Register<ChangeFavoriteShowMessage>(
                 this,
-                message =>
+                async message =>
                 {
                     UserService.SyncShowHistory(Shows);
+                    if (this is FavoritesShowTabViewModel && !(SelectedTab is FavoritesShowTabViewModel))
+                        NeedSync = true;
+                    else if (this is FavoritesShowTabViewModel && SelectedTab is FavoritesShowTabViewModel)
+                        await LoadShowsAsync();
                 });
 
             Messenger.Default.Register<ChangeLanguageMessage>(
@@ -384,7 +382,7 @@ namespace Popcorn.ViewModels.Pages.Home.Show.Tabs
                 _genre = e.NewValue;
                 if (SelectedTab == this)
                 {
-                    await LoadShowsAsync(true).ConfigureAwait(false);
+                    await LoadShowsAsync(true);
                 }
                 else
                 {
@@ -400,7 +398,7 @@ namespace Popcorn.ViewModels.Pages.Home.Show.Tabs
                 _rating = e.NewValue;
                 if (SelectedTab == this)
                 {
-                    await LoadShowsAsync(true).ConfigureAwait(false);
+                    await LoadShowsAsync(true);
                 }
                 else
                 {
@@ -432,7 +430,7 @@ namespace Popcorn.ViewModels.Pages.Home.Show.Tabs
             ReloadShows = new RelayCommand(async () =>
             {
                 ApplicationService.IsConnectionInError = false;
-                await LoadShowsAsync().ConfigureAwait(false);
+                await LoadShowsAsync();
             });
         }
     }

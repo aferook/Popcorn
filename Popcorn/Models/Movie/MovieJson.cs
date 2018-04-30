@@ -12,16 +12,18 @@ using Popcorn.Models.Subtitles;
 using Popcorn.Models.Torrent.Movie;
 using RestSharp.Deserializers;
 using Popcorn.Models.Media;
+using Popcorn.Models.Torrent;
+using Popcorn.Utils;
 
 namespace Popcorn.Models.Movie
 {
-    public class MovieJson : ObservableObject, IMediaFile, IMovie
+    public class MovieJson : ObservableObject, IMediaFile, IMovie, IMedia
     {
         private List<CastJson> _cast;
 
         private ObservableCollection<Subtitle> _availableSubtitles =
             new ObservableCollection<Subtitle>();
-
+        
         private string _dateUploaded;
         private string _posterImage;
         private int _dateUploadedUnix;
@@ -33,7 +35,7 @@ namespace Popcorn.Models.Movie
         private List<string> _genres;
         private bool _hasBeenSeen;
         private string _backgroundImage;
-        private string _imdbCode;
+        private string _imdbId;
         private bool _isFavorite;
         private string _language;
         private int _likeCount;
@@ -60,10 +62,10 @@ namespace Popcorn.Models.Movie
         }
 
         [DataMember(Name = "imdb_code")]
-        public string ImdbCode
+        public string ImdbId
         {
-            get => _imdbCode;
-            set { Set(() => ImdbCode, ref _imdbCode, value); }
+            get => _imdbId;
+            set { Set(() => ImdbId, ref _imdbId, value); }
         }
 
         [DataMember(Name = "title")]
@@ -246,6 +248,10 @@ namespace Popcorn.Models.Movie
             set { Set(() => FullHdAvailable, ref _fullHdAvailable, value); }
         }
 
+        public ITorrent SelectedTorrent { get; set; }
+
+        public ObservableCollection<ITorrent> AvailableTorrents { get; set; }
+
         /// <summary>
         /// Available subtitles
         /// </summary>
@@ -268,7 +274,7 @@ namespace Popcorn.Models.Movie
                 {
                     DispatcherHelper.CheckBeginInvokeOnUI(async () =>
                     {
-                        var message = new CustomSubtitleMessage();
+                        var message = new ShowCustomSubtitleMessage();
                         await Messenger.Default.SendAsync(message);
                         if (!message.Error && !string.IsNullOrEmpty(message.FileName))
                         {
@@ -307,5 +313,11 @@ namespace Popcorn.Models.Movie
         }
 
         public string TranslationLanguage { get; set; }
+
+        public int? Season { get; set; }
+
+        public int? EpisodeNumber { get; set; }
+
+        public MediaType Type { get; } = MediaType.Movie;
     }
 }

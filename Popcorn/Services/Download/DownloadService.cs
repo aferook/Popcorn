@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using lt;
+using ltnet;
 using NLog;
 using System.IO;
 using GalaSoft.MvvmLight.Messaging;
@@ -32,7 +32,7 @@ namespace Popcorn.Services.Download
 
         private readonly ICacheService _cacheService;
 
-        public DownloadService(ICacheService cacheService)
+        protected DownloadService(ICacheService cacheService)
         {
             _cacheService = cacheService;
         }
@@ -46,7 +46,8 @@ namespace Popcorn.Services.Download
         /// <param name="playingProgress">The playing progress</param>
         /// <param name="reportPieceAvailability">Report the piece availability progress</param>
         protected virtual void BroadcastMediaBuffered(T media, Progress<double> reportDownloadProgress,
-            Progress<BandwidthRate> reportDownloadRate, IProgress<double> playingProgress, Progress<PieceAvailability> reportPieceAvailability)
+            Progress<BandwidthRate> reportDownloadRate, IProgress<double> playingProgress,
+            Progress<PieceAvailability> reportPieceAvailability)
         {
             throw new NotImplementedException();
         }
@@ -55,16 +56,16 @@ namespace Popcorn.Services.Download
         /// Download a torrent
         /// </summary>
         /// <returns><see cref="Task"/></returns>
-        public async Task Download(T media, TorrentType torrentType, MediaType mediaType, string torrentPath,
+        public Task Download(T media, TorrentType torrentType, MediaType mediaType, string torrentPath,
             int uploadLimit, int downloadLimit, IProgress<double> downloadProgress,
             IProgress<BandwidthRate> bandwidthRate, IProgress<int> nbSeeds, IProgress<int> nbPeers, Action buffered,
             Action cancelled,
             CancellationTokenSource cts)
         {
-            Logger.Info(
-                $"Start downloading : {torrentPath}");
-            await Task.Run(async () =>
+            return Task.Run(async () =>
             {
+                Logger.Info(
+                    $"Start downloading : {torrentPath}");
                 using (var session = new session())
                 {
                     downloadProgress.Report(0d);
@@ -141,7 +142,8 @@ namespace Popcorn.Services.Download
         /// <param name="cts"><see cref="CancellationTokenSource"/></param>
         /// <returns><see cref="Task"/></returns>
         private async Task HandleDownload(T media, MediaType type, int uploadLimit, int downloadLimit,
-            IProgress<double> downloadProgress, IProgress<BandwidthRate> bandwidthRate, IProgress<int> nbSeeds, IProgress<int> nbPeers,
+            IProgress<double> downloadProgress, IProgress<BandwidthRate> bandwidthRate, IProgress<int> nbSeeds,
+            IProgress<int> nbPeers,
             torrent_handle handle,
             session session, Action buffered, Action cancelled, CancellationTokenSource cts)
         {
@@ -197,8 +199,8 @@ namespace Popcorn.Services.Download
                             ETA = eta
                         });
 
-                        ((IProgress<double>)prog).Report(progress);
-                        ((IProgress<BandwidthRate>)bandwidth).Report(new BandwidthRate
+                        ((IProgress<double>) prog).Report(progress);
+                        ((IProgress<BandwidthRate>) bandwidth).Report(new BandwidthRate
                         {
                             DownloadRate = downRate,
                             UploadRate = upRate,
@@ -206,7 +208,20 @@ namespace Popcorn.Services.Download
                         });
 
                         var numPieces = handle.torrent_file().num_pieces() - 1;
-                        var cursor = Math.Floor((numPieces - 3 * numPieces / 100d) * playingProgression);
+                        double minBuffer;
+                        switch (type)
+                        {
+                            case MediaType.Movie:
+                                minBuffer = Constants.MinimumMovieBuffering / 100d;
+                                break;
+                            case MediaType.Show:
+                                minBuffer = Constants.MinimumShowBuffering / 100d;
+                                break;
+                            default:
+                                minBuffer = 0.03d;
+                                break;
+                        }
+                        var cursor = Math.Floor((numPieces - minBuffer * numPieces) * playingProgression);
                         var pieces = handle.piece_priorities()
                             .Select((piece, index) => new {Piece = piece, Index = index})
                             .ToList();
@@ -224,16 +239,16 @@ namespace Popcorn.Services.Download
 
                                 break;
                             }
-                            else
-                            {
-                                lastPieceAvailableIndex = piece.Index;
-                                handle.reset_piece_deadline(piece.Index);
-                            }
+
+                            lastPieceAvailableIndex = piece.Index;
+                            handle.reset_piece_deadline(piece.Index);
                         }
 
-                        pieceAvailability.Report(new PieceAvailability(numPieces, pieces.FirstOrDefault(a => a.Index >= cursor - 3 * numPieces / 100d).Index, lastPieceAvailableIndex));
+                        pieceAvailability.Report(new PieceAvailability(numPieces,
+                            pieces.First(a => a.Index >= cursor - minBuffer * numPieces).Index,
+                            lastPieceAvailableIndex));
                     }
-                    
+
                     handle.flush_cache();
                     if (handle.need_save_resume_data())
                         handle.save_resume_data(1);
@@ -256,7 +271,8 @@ namespace Popcorn.Services.Download
                         {
                             alreadyBuffered = true;
                             media.FilePath = filePath;
-                            BroadcastMediaBuffered(media, prog, bandwidth, playingProgress, (Progress<PieceAvailability>)pieceAvailability);
+                            BroadcastMediaBuffered(media, prog, bandwidth, playingProgress,
+                                (Progress<PieceAvailability>) pieceAvailability);
                         }
 
                         if (!alreadyBuffered)
@@ -286,7 +302,7 @@ namespace Popcorn.Services.Download
                     {
                         await Task.Delay(1000, cts.Token);
                     }
-                    catch (TaskCanceledException)
+                    catch (Exception ex) when (ex is TaskCanceledException || ex is ObjectDisposedException)
                     {
                         cancelled.Invoke();
                         sw.Stop();
@@ -294,7 +310,10 @@ namespace Popcorn.Services.Download
                         {
                             session.remove_torrent(handle, 1);
                         }
-                        catch (Exception) { }
+                        catch (Exception)
+                        {
+                            // ignored
+                        }
                         break;
                     }
                 }

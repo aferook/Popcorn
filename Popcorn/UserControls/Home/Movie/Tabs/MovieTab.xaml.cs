@@ -1,8 +1,10 @@
 ﻿using System;
+using System.Linq;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using Popcorn.Helpers;
 using Popcorn.ViewModels.Pages.Home.Movie.Tabs;
 
 namespace Popcorn.UserControls.Home.Movie.Tabs
@@ -25,14 +27,18 @@ namespace Popcorn.UserControls.Home.Movie.Tabs
 
         private async void OnLoaded(object sender, RoutedEventArgs e)
         {
-            var vm = DataContext as MovieTabsViewModel;
-            if (vm == null) return;
+            if (!(DataContext is MovieTabsViewModel vm)) return;
+            var split = "MovieTabViewModel";
+            ApplicationInsightsHelper.TelemetryClient.TrackPageView(
+                $"Movie Tab {vm.GetType().Name.Split(new[] {split}, StringSplitOptions.None).First()}");
+
             if (vm is PopularMovieTabViewModel || vm is GreatestMovieTabViewModel || vm is RecentMovieTabViewModel ||
-                vm is FavoritesMovieTabViewModel || vm is SeenMovieTabViewModel || vm is RecommendationsMovieTabViewModel)
+                vm is FavoritesMovieTabViewModel || vm is SeenMovieTabViewModel ||
+                vm is RecommendationsMovieTabViewModel)
             {
                 if (!vm.IsLoadingMovies && vm.NeedSync)
                 {
-                    await vm.LoadMoviesAsync(true).ConfigureAwait(false);
+                    await vm.LoadMoviesAsync(true);
                     vm.NeedSync = false;
                 }
             }
@@ -41,7 +47,7 @@ namespace Popcorn.UserControls.Home.Movie.Tabs
                 var searchVm = vm as SearchMovieTabViewModel;
                 if (!searchVm.IsLoadingMovies && vm.NeedSync)
                 {
-                    await searchVm.LoadMoviesAsync(true).ConfigureAwait(false);
+                    await searchVm.LoadMoviesAsync(true);
                     vm.NeedSync = false;
                 }
             }
@@ -66,24 +72,24 @@ namespace Popcorn.UserControls.Home.Movie.Tabs
             }
 
             await _semaphore.WaitAsync();
-            var vm = DataContext as MovieTabsViewModel;
-            if (vm == null)
+            if (!(DataContext is MovieTabsViewModel vm))
             {
                 _semaphore.Release();
                 return;
             }
 
             if (vm is PopularMovieTabViewModel || vm is GreatestMovieTabViewModel || vm is RecentMovieTabViewModel ||
-                vm is FavoritesMovieTabViewModel || vm is SeenMovieTabViewModel || vm is RecommendationsMovieTabViewModel)
+                vm is FavoritesMovieTabViewModel || vm is SeenMovieTabViewModel ||
+                vm is RecommendationsMovieTabViewModel)
             {
                 if (!vm.IsLoadingMovies)
-                    await vm.LoadMoviesAsync().ConfigureAwait(false);
+                    await vm.LoadMoviesAsync();
             }
             else if (vm is SearchMovieTabViewModel)
             {
                 var searchVm = vm as SearchMovieTabViewModel;
                 if (!searchVm.IsLoadingMovies)
-                    await searchVm.LoadMoviesAsync().ConfigureAwait(false);
+                    await searchVm.LoadMoviesAsync();
             }
 
             _semaphore.Release();

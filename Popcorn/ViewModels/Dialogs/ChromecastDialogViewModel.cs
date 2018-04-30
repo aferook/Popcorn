@@ -4,7 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using GalaSoft.MvvmLight;
-using GalaSoft.MvvmLight.Command;
+using GalaSoft.MvvmLight.CommandWpf;
 using GalaSoft.MvvmLight.Messaging;
 using GalaSoft.MvvmLight.Threading;
 using GoogleCast;
@@ -45,9 +45,9 @@ namespace Popcorn.ViewModels.Dialogs
 
         private bool _connectingToChromecast;
 
-        private readonly CastMediaMessage _message;
+        private readonly ShowCastMediaMessage _message;
 
-        public ChromecastDialogViewModel(CastMediaMessage message, IChromecastService chromecastService)
+        public ChromecastDialogViewModel(ShowCastMediaMessage message, IChromecastService chromecastService)
         {
             _chromecastService = chromecastService;
             _message = message;

@@ -168,7 +168,8 @@ namespace Popcorn.ViewModels.Windows.Settings
         /// <param name="subtitlesService">Subtitles service</param>
         /// <param name="cacheService">Cache service</param>
         /// <param name="manager">Notification manager</param>
-        public ApplicationSettingsViewModel(IUserService userService, ISubtitlesService subtitlesService, ICacheService cacheService,
+        public ApplicationSettingsViewModel(IUserService userService, ISubtitlesService subtitlesService,
+            ICacheService cacheService,
             NotificationMessageManager manager)
         {
             _cacheService = cacheService;
@@ -297,7 +298,7 @@ namespace Popcorn.ViewModels.Windows.Settings
             get => _updateDownloading;
             set { Set(() => UpdateDownloading, ref _updateDownloading, value); }
         }
-        
+
         /// <summary>
         /// True if update is available
         /// </summary>
@@ -398,7 +399,7 @@ namespace Popcorn.ViewModels.Windows.Settings
         {
             try
             {
-                var user = await _userService.GetUser().ConfigureAwait(false);
+                var user = await _userService.GetUser();
                 FileHelper.CreateFolders();
                 RefreshCacheSize();
                 SubtitleSizes = new ObservableCollection<SubtitleSize>
@@ -406,27 +407,27 @@ namespace Popcorn.ViewModels.Windows.Settings
                     new SubtitleSize
                     {
                         Label = LocalizationProviderHelper.GetLocalizedValue<string>("Bigger"),
-                        Size = 28
+                        Size = 34
                     },
                     new SubtitleSize
                     {
                         Label = LocalizationProviderHelper.GetLocalizedValue<string>("Big"),
-                        Size = 26
+                        Size = 30
                     },
                     new SubtitleSize
                     {
                         Label = LocalizationProviderHelper.GetLocalizedValue<string>("Normal"),
-                        Size = 22
+                        Size = 26
                     },
                     new SubtitleSize
                     {
                         Label = LocalizationProviderHelper.GetLocalizedValue<string>("Small"),
-                        Size = 18
+                        Size = 22
                     },
                     new SubtitleSize
                     {
                         Label = LocalizationProviderHelper.GetLocalizedValue<string>("Smaller"),
-                        Size = 14
+                        Size = 16
                     }
                 };
 
@@ -445,42 +446,36 @@ namespace Popcorn.ViewModels.Windows.Settings
                     {
                         LoadingSubtitles = true;
                         AvailableSubtitlesLanguages = new ObservableRangeCollection<string>();
-                        var languages = (await _subtitlesService.GetSubLanguages().ConfigureAwait(false))
+                        var languages = (await _subtitlesService.GetSubLanguages())
                             .Select(a => a.LanguageName)
                             .OrderBy(a => a)
                             .ToList();
-                        DispatcherHelper.CheckBeginInvokeOnUI(() =>
-                        {
-                            languages.Insert(0,
-                                LocalizationProviderHelper.GetLocalizedValue<string>("NoneLabel"));
-                            AvailableSubtitlesLanguages.AddRange(
-                                new ObservableRangeCollection<string>(languages));
-                            DefaultSubtitleLanguage = AvailableSubtitlesLanguages.Any(a => a == defaultSubtitleLanguage)
-                                ? defaultSubtitleLanguage
-                                : LocalizationProviderHelper.GetLocalizedValue<string>("NoneLabel");
-                            LoadingSubtitles = false;
-                        });
+                        languages.Insert(0,
+                            LocalizationProviderHelper.GetLocalizedValue<string>("NoneLabel"));
+                        AvailableSubtitlesLanguages.AddRange(
+                            new ObservableRangeCollection<string>(languages));
+                        DefaultSubtitleLanguage = AvailableSubtitlesLanguages.Any(a => a == defaultSubtitleLanguage)
+                            ? defaultSubtitleLanguage
+                            : LocalizationProviderHelper.GetLocalizedValue<string>("NoneLabel");
+                        LoadingSubtitles = false;
                     },
                     async () =>
                     {
 #if !DEBUG
-                        await StartUpdateProcessAsync().ConfigureAwait(false);
+                        await StartUpdateProcessAsync();
 #endif
                     }
                 };
 
-                Task.WhenAll(tasks.Select(task => task()).ToArray()).ConfigureAwait(false);
+                Task.WhenAll(tasks.Select(task => task()).ToArray());
             }
             catch (Exception ex)
             {
                 Logger.Error(ex);
-                DispatcherHelper.CheckBeginInvokeOnUI(() =>
-                {
-                    LoadingSubtitles = false;
-                    AvailableSubtitlesLanguages.Insert(0,
-                        LocalizationProviderHelper.GetLocalizedValue<string>("NoneLabel"));
-                    DefaultSubtitleLanguage = AvailableSubtitlesLanguages.FirstOrDefault();
-                });
+                LoadingSubtitles = false;
+                AvailableSubtitlesLanguages.Insert(0,
+                    LocalizationProviderHelper.GetLocalizedValue<string>("NoneLabel"));
+                DefaultSubtitleLanguage = AvailableSubtitlesLanguages.FirstOrDefault();
             }
 
             Language = new Language(_userService);
@@ -543,7 +538,8 @@ namespace Popcorn.ViewModels.Windows.Settings
                                         Logger.Info(
                                             "Restarting...");
 
-                                        await UpdateManager.RestartAppWhenExited($@"{_updateFilePath}\Popcorn.exe", "updated");
+                                        await UpdateManager.RestartAppWhenExited($@"{_updateFilePath}\Popcorn.exe",
+                                            "updated");
                                         Application.Current.MainWindow.Close();
                                     })
                                 .Dismiss().WithButton(

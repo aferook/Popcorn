@@ -1,4 +1,224 @@
-﻿# 3.4.6 - 30/11/2017 #
+﻿# 4.0.1 25/04/2018 #
+***
+Fixed issue.
+
+### Details ###
+* Fixed issue with player commands.
+
+# 4.0.0 25/04/2018 #
+***
+Updated .NET Framework.
+
+### Details ###
+* Updated .NET to 4.7.1
+
+# 3.6.7 23/04/2018 #
+***
+Fixed issue
+
+### Details ###
+* Fixed issue with logging.
+
+# 3.6.6 23/04/2018 #
+***
+Fixed issue
+
+### Details ###
+* Hanging at launch.
+
+# 3.6.5  23/04/2018 #
+***
+Added logging field.
+
+### Details ###
+* Add page views.
+
+# 3.6.4- 23/04/2018 #
+***
+Improved logging.
+
+### Details ###
+* Add page views.
+
+# 3.6.3- 15/04/2018 #
+***
+Fixed issue.
+
+### Details ###
+* Fixed issue [#195](https://github.com/bbougot/Popcorn/issues/195).
+
+# 3.6.2 - 15/04/2018 #
+***
+Fixed issues with subtitles
+
+### Details ###
+* Fixed issue [#183](https://github.com/bbougot/Popcorn/issues/183).
+* Fixed issue [#182](https://github.com/bbougot/Popcorn/issues/182).
+* Fixed issue [#135](https://github.com/bbougot/Popcorn/issues/135).
+
+# 3.6.1 - 13/02/2018 #
+***
+Fixed issue
+
+### Details ###
+* Fixed issue [#181](https://github.com/bbougot/Popcorn/issues/181).
+
+# 3.6.0 - 13/02/2018 #
+***
+Fixed issue
+
+### Details ###
+* Fixed issue [#165](https://github.com/bbougot/Popcorn/issues/165).
+
+# 3.5.16 - 01/02/2018 #
+***
+Fixed issue
+
+### Details ###
+* Fixed issue with trailers.
+
+# 3.5.15 - 01/02/2018 #
+***
+Fixed issue
+
+### Details ###
+* Fixed issue with player buttons.
+
+# 3.5.14 - 01/02/2018 #
+***
+Improved player
+
+### Details ###
+* Improved player stability and performances.
+
+# 3.5.13 - 30/01/2018 #
+***
+Fix issue
+
+### Details ###
+* Fix update issue.
+
+# 3.5.12 - 29/01/2018 #
+***
+Fix issue
+
+### Details ###
+* Fixed issue [#179](https://github.com/bbougot/Popcorn/issues/179).
+
+# 3.5.11 - 29/01/2018 #
+***
+Fix issue
+
+### Details ###
+* Fix player logger issue.
+
+# 3.5.10 - 28/01/2018 #
+***
+Add logging
+
+### Details ###
+* Add player logging.
+
+# 3.5.9 - 23/01/2018 #
+***
+Fixed issue
+
+### Details ###
+* Fixed issue.
+
+# 3.5.8 - 23/01/2018 #
+***
+Fixed issue
+
+### Details ###
+* Fixed issue.
+
+# 3.5.7 - 23/01/2018 #
+***
+Improve performances
+
+### Details ###
+* Improve player performances.
+
+# 3.5.6 - 12/01/2018 #
+***
+Fixed issues
+
+### Details ###
+* Fixed issue [#97](https://github.com/bbougot/Popcorn/issues/97).
+
+# 3.5.5 - 10/01/2018 #
+***
+Improved performances
+
+### Details ###
+* Improved player performances.
+
+# 3.5.4 - 09/01/2018 #
+***
+Fixed issue
+
+### Details ###
+* Fixed issue with torrent informations.
+
+# 3.5.3 - 09/01/2018 #
+***
+Fixed issue
+
+### Details ###
+* Fixed issue with update process.
+
+# 3.5.2 - 09/01/2018 #
+***
+Improved UI
+
+### Details ###
+* Improved torrent informations.
+
+# 3.5.1 - 08/01/2018 #
+***
+Fixed issues
+
+### Details ###
+* Improved stability
+
+# 3.5.0 - 30/12/2017 #
+***
+Improved performances.
+
+### Details ###
+* Drastically improved UI performances.
+
+# 3.4.10 - 30/12/2017 #
+***
+Fixed issues
+
+### Details ###
+* Fixed recommendations.
+
+# 3.4.9 - 29/12/2017 #
+***
+Fixed issues
+
+### Details ###
+* Fixed issue [#160](https://github.com/bbougot/Popcorn/issues/160).
+
+# 3.4.8 - 27/12/2017 #
+***
+Fixed issues
+
+### Details ###
+* Fixed issue [#168](https://github.com/bbougot/Popcorn/issues/168).
+* Fixed issue [#164](https://github.com/bbougot/Popcorn/issues/164).
+
+# 3.4.7 - 19/12/2017 #
+***
+Fixed missing movies
+
+### Details ###
+* Fixed an issue which could lead to missing movies.
+
+# 3.4.6 - 30/11/2017 #
 ***
 Fixed issues
 

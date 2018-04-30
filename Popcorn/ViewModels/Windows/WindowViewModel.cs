@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -22,6 +24,7 @@ using Popcorn.Dialogs;
 using Popcorn.Extensions;
 using Popcorn.Helpers;
 using Popcorn.Messaging;
+using Popcorn.Models.Subtitles;
 using Popcorn.Services.Application;
 using Popcorn.Services.Cache;
 using Popcorn.Services.Chromecast;
@@ -49,7 +52,7 @@ namespace Popcorn.ViewModels.Windows
         private static Logger Logger { get; } = LogManager.GetCurrentClassLogger();
 
         /// <summary>
-        /// Holds the async message relative to <see cref="CustomSubtitleMessage"/>
+        /// Holds the async message relative to <see cref="ShowCustomSubtitleMessage"/>
         /// </summary>
         private IDisposable _customSubtitleMessage;
 
@@ -59,9 +62,14 @@ namespace Popcorn.ViewModels.Windows
         private IDisposable _showSubtitleDialogMessage;
 
         /// <summary>
-        /// Holds the async message relative to <see cref="CastMediaMessage"/>
+        /// Holds the async message relative to <see cref="ShowCastMediaMessage"/>
         /// </summary>
         private IDisposable _castMediaMessage;
+
+        /// <summary>
+        /// Holds the async message relative to <see cref="ShowDownloadSettingsDialogMessage"/>
+        /// </summary>
+        private IDisposable _showDownloadSettingsMessage;
 
         /// <summary>
         /// Used to define the dialog context
@@ -89,9 +97,19 @@ namespace Popcorn.ViewModels.Windows
         private bool _isSettingsFlyoutOpen;
 
         /// <summary>
+        /// Specify if about dialog is open
+        /// </summary>
+        private bool _canOpenAboutDialog = true;
+
+        /// <summary>
         /// If an update is available
         /// </summary>
         private bool _updateAvailable;
+
+        /// <summary>
+        /// Toggle fullscreen mode
+        /// </summary>
+        private bool _toggleFullscreen;
 
         /// <summary>
         /// Application state
@@ -189,7 +207,7 @@ namespace Popcorn.ViewModels.Windows
             get => _isSettingsFlyoutOpen;
             set { Set(() => IsSettingsFlyoutOpen, ref _isSettingsFlyoutOpen, value); }
         }
-
+        
         /// <summary>
         /// Specify if movie flyout is open
         /// </summary>
@@ -261,9 +279,14 @@ namespace Popcorn.ViewModels.Windows
         public ICommand OpenAboutCommand { get; private set; }
 
         /// <summary>
-        /// Command used to open help dialog
+        /// Command used to switch fullscreen mode
         /// </summary>
-        public ICommand OpenHelpCommand { get; private set; }
+        public ICommand SwitchFullScreenCommand { get; private set; }
+
+        /// <summary>
+        /// Command used to open Github
+        /// </summary>
+        public ICommand GoToGitHubCommand { get; private set; }
 
         /// <summary>
         /// Command used to load tabs
@@ -300,28 +323,29 @@ namespace Popcorn.ViewModels.Windows
 
             Messenger.Default.Register<LoadShowMessage>(this, e => IsShowFlyoutOpen = true);
 
-            Messenger.Default.Register<PlayShowEpisodeMessage>(this, message => DispatcherHelper.CheckBeginInvokeOnUI(
-                async () =>
-                {
-                    MediaPlayer = new MediaPlayerViewModel(_chromecastService, _subtitlesService, _cacheService,
-                        message.Episode.FilePath,
-                        message.Episode.Title,
-                        MediaType.Show,
-                        () =>
-                        {
-                            Messenger.Default.Send(new StopPlayingEpisodeMessage());
-                        },
-                        () =>
-                        {
-                            Messenger.Default.Send(new StopPlayingEpisodeMessage());
-                        },
-                        message.PlayingProgress,
-                        message.BufferProgress,
-                        message.PieceAvailability,
-                        message.BandwidthRate,
-                        message.Episode.SelectedSubtitle,
-                        message.Episode.AvailableSubtitles);
+            Messenger.Default.Register<PlayShowEpisodeMessage>(this, message =>
+            {
+                MediaPlayer = new MediaPlayerViewModel(_chromecastService, _subtitlesService, _cacheService,
+                    message.Episode.FilePath,
+                    message.Episode.Title,
+                    MediaType.Show,
+                    () =>
+                    {
+                        Messenger.Default.Send(new StopPlayingEpisodeMessage());
+                    },
+                    () =>
+                    {
+                        Messenger.Default.Send(new StopPlayingEpisodeMessage());
+                    },
+                    message.PlayingProgress,
+                    message.BufferProgress,
+                    message.PieceAvailability,
+                    message.BandwidthRate,
+                    message.Episode.SelectedSubtitle,
+                    message.Episode.AvailableSubtitles);
 
+                DispatcherHelper.CheckBeginInvokeOnUI(() =>
+                {
                     ApplicationService.IsMediaPlaying = true;
                     IsShowFlyoutOpen = false;
                     if (NavigationService.CurrentSource.OriginalString == "Popcorn;component/Pages/PlayerPage.xaml")
@@ -334,30 +358,51 @@ namespace Popcorn.ViewModels.Windows
                             UriKind.Relative));
                     }
 
-                    await Task.Delay(500);
                     IgnoreTaskbarOnMaximize = true;
-                }));
+                });
+            });
 
-            Messenger.Default.Register<PlayMediaMessage>(this, message => DispatcherHelper.CheckBeginInvokeOnUI(
-                async () =>
+            Messenger.Default.Register<PlayMediaMessage>(this, message =>
+            {
+                MediaPlayer = new MediaPlayerViewModel(_chromecastService, _subtitlesService, _cacheService,
+                    message.MediaPath,
+                    message.MediaPath,
+                    MediaType.Unkown,
+                    () =>
+                    {
+                        Messenger.Default.Send(new NavigateToHomePageMessage());
+                    },
+                    () =>
+                    {
+                        Messenger.Default.Send(new NavigateToHomePageMessage());
+                    },
+                    message.PlayingProgress,
+                    message.BufferProgress,
+                    message.PieceAvailability,
+                    message.BandwidthRate, subtitles: new List<Subtitle>
+                    {
+                        new Subtitle
+                        {
+                            Sub = new OSDB.Subtitle
+                            {
+                                LanguageId = LocalizationProviderHelper.GetLocalizedValue<string>("NoneLabel"),
+                                LanguageName = LocalizationProviderHelper.GetLocalizedValue<string>("NoneLabel"),
+                                SubtitleId = "none"
+                            }
+                        },
+                        new Subtitle
+                        {
+                            Sub = new OSDB.Subtitle
+                            {
+                                LanguageId = LocalizationProviderHelper.GetLocalizedValue<string>("CustomLabel"),
+                                LanguageName = LocalizationProviderHelper.GetLocalizedValue<string>("CustomLabel"),
+                                SubtitleId = "custom"
+                            }
+                        }
+                    });
+
+                DispatcherHelper.CheckBeginInvokeOnUI(() =>
                 {
-                    MediaPlayer = new MediaPlayerViewModel(_chromecastService, _subtitlesService, _cacheService,
-                        message.MediaPath,
-                        message.MediaPath,
-                        MediaType.Unkown,
-                        () =>
-                        {
-                            Messenger.Default.Send(new StopPlayMediaMessage());
-                        },
-                        () =>
-                        {
-                            Messenger.Default.Send(new StopPlayMediaMessage());
-                        },
-                        message.PlayingProgress,
-                        message.BufferProgress,
-                        message.PieceAvailability,
-                        message.BandwidthRate);
-
                     ApplicationService.IsMediaPlaying = true;
                     IsShowFlyoutOpen = false;
                     IsMovieFlyoutOpen = false;
@@ -371,33 +416,34 @@ namespace Popcorn.ViewModels.Windows
                             UriKind.Relative));
                     }
 
-                    await Task.Delay(500);
                     IgnoreTaskbarOnMaximize = true;
-                }));
+                });
+            });
 
-            Messenger.Default.Register<PlayMovieMessage>(this, message => DispatcherHelper.CheckBeginInvokeOnUI(
-                async () =>
+            Messenger.Default.Register<PlayMovieMessage>(this, message =>
+            {
+                MediaPlayer = new MediaPlayerViewModel(_chromecastService, _subtitlesService, _cacheService,
+                    message.Movie.FilePath, message.Movie.Title,
+                    MediaType.Movie,
+                    () =>
+                    {
+                        Messenger.Default.Send(new StopPlayingMovieMessage());
+                    },
+                    () =>
+                    {
+                        _userService.SetMovie(message.Movie);
+                        Messenger.Default.Send(new ChangeSeenMovieMessage());
+                        Messenger.Default.Send(new StopPlayingMovieMessage());
+                    },
+                    message.PlayingProgress,
+                    message.BufferProgress,
+                    message.PieceAvailability,
+                    message.BandwidthRate,
+                    message.Movie.SelectedSubtitle,
+                    message.Movie.AvailableSubtitles);
+
+                DispatcherHelper.CheckBeginInvokeOnUI(() =>
                 {
-                    MediaPlayer = new MediaPlayerViewModel(_chromecastService, _subtitlesService, _cacheService,
-                        message.Movie.FilePath, message.Movie.Title,
-                        MediaType.Movie,
-                        () =>
-                        {
-                            Messenger.Default.Send(new StopPlayingMovieMessage());
-                        },
-                        () =>
-                        {
-                            _userService.SetMovie(message.Movie);
-                            Messenger.Default.Send(new ChangeSeenMovieMessage());
-                            Messenger.Default.Send(new StopPlayingMovieMessage());
-                        },
-                        message.PlayingProgress,
-                        message.BufferProgress,
-                        message.PieceAvailability,
-                        message.BandwidthRate,
-                        message.Movie.SelectedSubtitle,
-                        message.Movie.AvailableSubtitles);
-
                     ApplicationService.IsMediaPlaying = true;
                     IsMovieFlyoutOpen = false;
                     if (NavigationService.CurrentSource.OriginalString == "Popcorn;component/Pages/PlayerPage.xaml")
@@ -410,18 +456,20 @@ namespace Popcorn.ViewModels.Windows
                             UriKind.Relative));
                     }
 
-                    await Task.Delay(500);
                     IgnoreTaskbarOnMaximize = true;
-                }));
+                });
+            });
 
-            Messenger.Default.Register<PlayTrailerMessage>(this, message => DispatcherHelper.CheckBeginInvokeOnUI(
-                async () =>
+            Messenger.Default.Register<PlayTrailerMessage>(this, message =>
+            {
+                MediaPlayer = new MediaPlayerViewModel(_chromecastService, _subtitlesService, _cacheService,
+                    message.TrailerUrl,
+                    message.MovieTitle,
+                    MediaType.Trailer,
+                    message.TrailerStoppedAction, message.TrailerEndedAction);
+
+                DispatcherHelper.CheckBeginInvokeOnUI(() =>
                 {
-                    MediaPlayer = new MediaPlayerViewModel(_chromecastService, _subtitlesService, _cacheService,
-                        message.TrailerUrl,
-                        message.MovieTitle,
-                        MediaType.Trailer,
-                        message.TrailerStoppedAction, message.TrailerEndedAction);
                     ApplicationService.IsMediaPlaying = true;
                     IsMovieFlyoutOpen = false;
                     IsShowFlyoutOpen = false;
@@ -435,16 +483,17 @@ namespace Popcorn.ViewModels.Windows
                             UriKind.Relative));
                     }
 
-                    await Task.Delay(500);
                     IgnoreTaskbarOnMaximize = true;
-                }));
+                });
+            });
 
             Messenger.Default.Register<StopPlayingTrailerMessage>(this, message =>
             {
-                IgnoreTaskbarOnMaximize = false;
+                if (!_toggleFullscreen)
+                    IgnoreTaskbarOnMaximize = false;
                 if (ApplicationService.IsMediaPlaying)
                 {
-                    if (ApplicationService.IsFullScreen)
+                    if (!_toggleFullscreen && ApplicationService.IsFullScreen)
                     {
                         ApplicationService.IsFullScreen = false;
                         ApplicationService.IsFullScreen = true;
@@ -464,25 +513,54 @@ namespace Popcorn.ViewModels.Windows
 
             Messenger.Default.Register<StopPlayMediaMessage>(this, message =>
             {
-                IgnoreTaskbarOnMaximize = false;
-                if (ApplicationService.IsMediaPlaying && ApplicationService.IsFullScreen)
-                {
-                    ApplicationService.IsFullScreen = false;
-                    ApplicationService.IsFullScreen = true;
-                }
-
-                ApplicationService.IsMediaPlaying = false;
-            });
-
-            Messenger.Default.Register<StopPlayingEpisodeMessage>(
-                this,
-                message =>
+                if (!_toggleFullscreen)
                 {
                     IgnoreTaskbarOnMaximize = false;
                     if (ApplicationService.IsMediaPlaying && ApplicationService.IsFullScreen)
                     {
                         ApplicationService.IsFullScreen = false;
                         ApplicationService.IsFullScreen = true;
+                    }
+                }
+
+                ApplicationService.IsMediaPlaying = false;
+            });
+
+            Messenger.Default.Register<NavigateToHomePageMessage>(this, message =>
+            {
+                if (!_toggleFullscreen)
+                {
+                    IgnoreTaskbarOnMaximize = false;
+                    if (ApplicationService.IsMediaPlaying && ApplicationService.IsFullScreen)
+                    {
+                        ApplicationService.IsFullScreen = false;
+                        ApplicationService.IsFullScreen = true;
+                    }
+                }
+
+                ApplicationService.IsMediaPlaying = false;
+                IsMovieFlyoutOpen = false;
+                IsShowFlyoutOpen = false;
+
+                if (NavigationService.CurrentSource.OriginalString != "Pages/HomePage.xaml" &&
+                    NavigationService.CanGoBack)
+                {
+                    NavigationService.GoBack();
+                }
+            });
+
+            Messenger.Default.Register<StopPlayingEpisodeMessage>(
+                this,
+                message =>
+                {
+                    if (!_toggleFullscreen)
+                    {
+                        IgnoreTaskbarOnMaximize = false;
+                        if (ApplicationService.IsMediaPlaying && ApplicationService.IsFullScreen)
+                        {
+                            ApplicationService.IsFullScreen = false;
+                            ApplicationService.IsFullScreen = true;
+                        }
                     }
 
                     ApplicationService.IsMediaPlaying = false;
@@ -493,11 +571,14 @@ namespace Popcorn.ViewModels.Windows
                 this,
                 message =>
                 {
-                    IgnoreTaskbarOnMaximize = false;
-                    if (ApplicationService.IsMediaPlaying && ApplicationService.IsFullScreen)
+                    if (!_toggleFullscreen)
                     {
-                        ApplicationService.IsFullScreen = false;
-                        ApplicationService.IsFullScreen = true;
+                        IgnoreTaskbarOnMaximize = false;
+                        if (ApplicationService.IsMediaPlaying && ApplicationService.IsFullScreen)
+                        {
+                            ApplicationService.IsFullScreen = false;
+                            ApplicationService.IsFullScreen = true;
+                        }
                     }
 
                     ApplicationService.IsMediaPlaying = false;
@@ -539,7 +620,7 @@ namespace Popcorn.ViewModels.Windows
                 await HandleTorrentDownload(message.MagnetLink);
             });
 
-            _castMediaMessage = Messenger.Default.RegisterAsyncMessage<CastMediaMessage>(async message =>
+            _castMediaMessage = Messenger.Default.RegisterAsyncMessage<ShowCastMediaMessage>(async message =>
             {
                 var vm = new ChromecastDialogViewModel(message, _chromecastService);
                 var castDialog = new CastDialog
@@ -551,7 +632,10 @@ namespace Popcorn.ViewModels.Windows
                 {
                     try
                     {
-                        await _dialogCoordinator.HideMetroDialogAsync(this, castDialog);
+                        var dialog = await _dialogCoordinator.GetCurrentDialogAsync<CastDialog>(
+                            this);
+                        if (dialog != null)
+                            await _dialogCoordinator.HideMetroDialogAsync(this, dialog);
                         cts.TrySetResult(null);
                     }
                     catch (Exception ex)
@@ -586,7 +670,10 @@ namespace Popcorn.ViewModels.Windows
                         try
                         {
                             message.SelectedSubtitle = vm.SelectedSubtitle?.Sub;
-                            await _dialogCoordinator.HideMetroDialogAsync(this, subtitleDialog);
+                            var dialog = await _dialogCoordinator.GetCurrentDialogAsync<SubtitleDialog>(
+                                this);
+                            if (dialog != null)
+                                await _dialogCoordinator.HideMetroDialogAsync(this, dialog);
                             cts.TrySetResult(null);
                         }
                         catch (Exception ex)
@@ -606,14 +693,52 @@ namespace Popcorn.ViewModels.Windows
                     }
                 });
 
-            _customSubtitleMessage = Messenger.Default.RegisterAsyncMessage<CustomSubtitleMessage>(
+            _showDownloadSettingsMessage = Messenger.Default.RegisterAsyncMessage<ShowDownloadSettingsDialogMessage>(
+                async message =>
+                {
+                    var vm = new DownloadSettingsDialogViewModel(message.Media, _subtitlesService);
+                    var subtitleDialog = new DownloadSettingsDialog
+                    {
+                        DataContext = vm
+                    };
+
+                    var cts = new TaskCompletionSource<object>();
+                    vm.OnCloseAction = async result =>
+                    {
+                        try
+                        {
+                            message.Download = result;
+                            var dialog = await _dialogCoordinator.GetCurrentDialogAsync<DownloadSettingsDialog>(
+                                this);
+                            if (dialog != null)
+                                await _dialogCoordinator.HideMetroDialogAsync(this, dialog);
+                            cts.TrySetResult(null);
+                        }
+                        catch (Exception ex)
+                        {
+                            cts.TrySetException(ex);
+                        }
+                    };
+
+                    try
+                    {
+                        await _dialogCoordinator.ShowMetroDialogAsync(this, subtitleDialog);
+                        await cts.Task;
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Error(ex);
+                    }
+                });
+
+            _customSubtitleMessage = Messenger.Default.RegisterAsyncMessage<ShowCustomSubtitleMessage>(
                 async message =>
                 {
                     var fileDialog = new OpenFileDialog
                     {
                         Title = "Open Sub File",
                         Filter = "SUB files (*.sub,*srt,*sbv)|*.sub;*.srt;*.sbv",
-                        InitialDirectory = @"C:\"
+                        InitialDirectory = Path.GetPathRoot(Environment.SystemDirectory)
                     };
 
                     if (fileDialog.ShowDialog() == true)
@@ -662,9 +787,9 @@ namespace Popcorn.ViewModels.Windows
             {
                 try
                 {
+                    FileHelper.ClearFolders();
                     await _userService.UpdateUser();
                     await SaveCacheOnExit();
-                    FileHelper.ClearFolders();
                 }
                 catch (Exception ex)
                 {
@@ -681,7 +806,7 @@ namespace Popcorn.ViewModels.Windows
                     if (e.Data.GetDataPresent(DataFormats.FileDrop))
                     {
                         var files = (string[]) e.Data.GetData(DataFormats.FileDrop);
-                        var torrentFile = files?.FirstOrDefault(a => a.Contains("torrent"));
+                        var torrentFile = files?.FirstOrDefault(a => a.Contains("torrent") || a.Contains("magnet"));
                         if (torrentFile != null)
                         {
                             var vm = new DropTorrentDialogViewModel(_cacheService, torrentFile);
@@ -690,40 +815,49 @@ namespace Popcorn.ViewModels.Windows
                                 DataContext = vm
                             };
 
+                            Messenger.Default.Send(new DropFileMessage(DropFileMessage.DropFileEvent.Leave));
                             await _dialogCoordinator.ShowMetroDialogAsync(this, dropTorrentDialog);
                             var settings = SimpleIoc.Default.GetInstance<ApplicationSettingsViewModel>();
-                            Task.Run(async () =>
-                            {
-                                await vm.Download(settings.UploadLimit, settings.DownloadLimit,
-                                    async () =>
+                            await vm.Download(settings.UploadLimit, settings.DownloadLimit,
+                                async () =>
+                                {
+                                    try
                                     {
-                                        try
-                                        {
-                                            await _dialogCoordinator.HideMetroDialogAsync(this, dropTorrentDialog);
-                                        }
-                                        catch (Exception ex)
-                                        {
-                                            Logger.Error(ex);
-                                        }
-                                    }, async () =>
+                                        var dialog =
+                                            await _dialogCoordinator.GetCurrentDialogAsync<DropTorrentDialog>(
+                                                this);
+                                        if (dialog != null)
+                                            await _dialogCoordinator.HideMetroDialogAsync(this, dialog);
+                                    }
+                                    catch (Exception ex)
                                     {
-                                        try
-                                        {
-                                            await _dialogCoordinator.HideMetroDialogAsync(this, dropTorrentDialog);
-                                        }
-                                        catch (Exception ex)
-                                        {
-                                            Logger.Error(ex);
-                                        }
-                                    });
-                            });
+                                        Logger.Error(ex);
+                                    }
+                                }, async () =>
+                                {
+                                    try
+                                    {
+                                        var dialog =
+                                            await _dialogCoordinator.GetCurrentDialogAsync<DropTorrentDialog>(
+                                                this);
+                                        if (dialog != null)
+                                            await _dialogCoordinator.HideMetroDialogAsync(this, dialog);
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Logger.Error(ex);
+                                    }
+                                });
                         }
 
-                        Messenger.Default.Send(new DropFileMessage(DropFileMessage.DropFileEvent.Leave));
+                        var subtitleFile = files?.FirstOrDefault(a => a.Contains(".sub") || a.Contains(".srt") || a.Contains(".sbv"));
+                        if (subtitleFile != null)
+                        {
+                            MediaPlayer?.SelectSubtitlesCommand.Execute(subtitleFile);
+                        }
                     }
                     else
                     {
-                        Messenger.Default.Send(new DropFileMessage(DropFileMessage.DropFileEvent.Leave));
                         Messenger.Default.Send(
                             new UnhandledExceptionMessage(
                                 new NoDataInDroppedFileException(
@@ -732,22 +866,53 @@ namespace Popcorn.ViewModels.Windows
                 }
                 catch (Exception)
                 {
-                    Messenger.Default.Send(new DropFileMessage(DropFileMessage.DropFileEvent.Leave));
                     Messenger.Default.Send(
                         new UnhandledExceptionMessage(
                             new PopcornException(
                                 LocalizationProviderHelper.GetLocalizedValue<string>("DroppedFileIssue"))));
                 }
+                finally
+                {
+                    Messenger.Default.Send(new DropFileMessage(DropFileMessage.DropFileEvent.Leave));
+                }
+            });
+
+            SwitchFullScreenCommand = new RelayCommand(() =>
+            {
+                ToggleFullscren = !ToggleFullscren;
+                if (ApplicationService.IsFullScreen && !IgnoreTaskbarOnMaximize)
+                    IgnoreTaskbarOnMaximize = true;
+                else if (ApplicationService.IsFullScreen && IgnoreTaskbarOnMaximize)
+                {
+                    IgnoreTaskbarOnMaximize = false;
+                    ApplicationService.IsFullScreen = false;
+                }
+                else if (!ApplicationService.IsFullScreen && IgnoreTaskbarOnMaximize)
+                {
+                    IgnoreTaskbarOnMaximize = false;
+                }
+                else
+                {
+                    IgnoreTaskbarOnMaximize = true;
+                    ApplicationService.IsFullScreen = true;
+                }
             });
 
             OpenAboutCommand = new RelayCommand(async () =>
             {
+                _canOpenAboutDialog = false;
+
                 var aboutDialog = new AboutDialog();
                 var vm = new AboutDialogViewModel(async () =>
                 {
                     try
                     {
-                        await _dialogCoordinator.HideMetroDialogAsync(this, aboutDialog);
+                        _canOpenAboutDialog = true;
+
+                        var dialog = await _dialogCoordinator.GetCurrentDialogAsync<AboutDialog>(
+                            this);
+                        if (dialog != null)
+                            await _dialogCoordinator.HideMetroDialogAsync(this, dialog);
                     }
                     catch (Exception ex)
                     {
@@ -757,25 +922,11 @@ namespace Popcorn.ViewModels.Windows
 
                 aboutDialog.DataContext = vm;
                 await _dialogCoordinator.ShowMetroDialogAsync(this, aboutDialog);
-            });
+            }, () => _canOpenAboutDialog);
 
-            OpenHelpCommand = new RelayCommand(async () =>
+            GoToGitHubCommand = new RelayCommand(() =>
             {
-                var helpDialog = new HelpDialog();
-                var vm = new HelpDialogViewModel(async () =>
-                {
-                    try
-                    {
-                        await _dialogCoordinator.HideMetroDialogAsync(this, helpDialog);
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Error(ex);
-                    }
-                });
-
-                helpDialog.DataContext = vm;
-                await _dialogCoordinator.ShowMetroDialogAsync(this, helpDialog);
+                Process.Start(new ProcessStartInfo("https://github.com/bbougot/Popcorn"));
             });
 
             DragEnterFileCommand = new RelayCommand<DragEventArgs>(e =>
@@ -809,20 +960,21 @@ namespace Popcorn.ViewModels.Windows
         private async Task HandleTorrentDownload(string path)
         {
             var filePath = string.Empty;
-            if (path.StartsWith("magnet"))
-            {
-                filePath = $"{_cacheService.DropFilesDownloads}{Guid.NewGuid()}.torrent";
-                using (var file = File.Create(filePath))
-                using (var stream = new StreamWriter(file))
-                {
-                    await stream.WriteLineAsync(path);
-                }
-            }
-            else if (path.EndsWith("torrent"))
-            {
-                filePath = path;
-            }
+            //if (path.StartsWith("magnet"))
+            //{
+            //    filePath = $"{_cacheService.DropFilesDownloads}{Guid.NewGuid()}.torrent";
+            //    using (var file = File.Create(filePath))
+            //    using (var stream = new StreamWriter(file))
+            //    {
+            //        await stream.WriteLineAsync(path);
+            //    }
+            //}
+            //else if (path.EndsWith("torrent"))
+            //{
+            //    filePath = path;
+            //}
 
+            filePath = path;
             var vm = new DropTorrentDialogViewModel(_cacheService, filePath);
             var dropTorrentDialog = new DropTorrentDialog
             {
@@ -831,19 +983,34 @@ namespace Popcorn.ViewModels.Windows
 
             try
             {
-                Task.Run(async () =>
-                {
-                    await _dialogCoordinator.ShowMetroDialogAsync(this, dropTorrentDialog);
-                    var settings = SimpleIoc.Default.GetInstance<ApplicationSettingsViewModel>();
-                    await vm.Download(settings.UploadLimit, settings.DownloadLimit,
-                        async () => { await _dialogCoordinator.HideMetroDialogAsync(this, dropTorrentDialog); },
-                        async () => { await _dialogCoordinator.HideMetroDialogAsync(this, dropTorrentDialog); });
-                });
+                await _dialogCoordinator.ShowMetroDialogAsync(this, dropTorrentDialog);
+                var settings = SimpleIoc.Default.GetInstance<ApplicationSettingsViewModel>();
+                await vm.Download(settings.UploadLimit, settings.DownloadLimit,
+                    async () =>
+                    {
+                        var dialog = await _dialogCoordinator.GetCurrentDialogAsync<DropTorrentDialog>(
+                            this);
+                        if (dialog != null)
+                            await _dialogCoordinator.HideMetroDialogAsync(this, dialog);
+                    },
+                    async () =>
+                    {
+                        var dialog = await _dialogCoordinator.GetCurrentDialogAsync<DropTorrentDialog>(
+                            this);
+                        if (dialog != null)
+                            await _dialogCoordinator.HideMetroDialogAsync(this, dialog);
+                    });
             }
             catch (Exception ex)
             {
                 Logger.Error(ex);
             }
+        }
+
+        public bool ToggleFullscren
+        {
+            get => _toggleFullscreen;
+            set => Set(ref _toggleFullscreen, value);
         }
 
         /// <summary>

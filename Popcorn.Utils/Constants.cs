@@ -14,7 +14,7 @@ namespace Popcorn.Utils
         /// <summary>
         /// App version
         /// </summary>
-        public const string AppVersion = "3.4.6";
+        public const string AppVersion = "4.0.1";
 
         /// <summary>
         /// Endpoint to API
@@ -24,7 +24,12 @@ namespace Popcorn.Utils
         /// <summary>
         /// Url used to start a local OWIN server
         /// </summary>
-        public const string ServerUrl = "http://*:9900/";
+        public static string ServerUrl {get;} = $"http://*:{ServerPort}/";
+
+        /// <summary>
+        /// Local server port
+        /// </summary>
+        public const int ServerPort = 9900;
 
         /// <summary>
         /// Open Subtitles User Agent
@@ -39,8 +44,8 @@ namespace Popcorn.Utils
         /// <summary>
         /// Path to the FFmpeg shared libs
         /// </summary>
-        public static string FFmpegPath => $@"{Directory.GetParent(new Uri(Assembly.GetExecutingAssembly().CodeBase)
-            .AbsolutePath)}\FFmpeg";
+        public static string FFmpegPath => $@"{new Uri(Assembly.GetExecutingAssembly().GetPath())
+            .OriginalString}\FFmpeg";
 
         /// <summary>
         /// In percentage, the minimum of buffering before we can actually start playing the movie
@@ -55,7 +60,7 @@ namespace Popcorn.Utils
                 }
                 catch (Exception)
                 {
-                    return 10d;
+                    return 3d;
                 }
             }
         }
@@ -73,7 +78,7 @@ namespace Popcorn.Utils
                 }
                 catch (Exception)
                 {
-                    return 15d;
+                    return 5d;
                 }
             }
         }
@@ -96,6 +101,6 @@ namespace Popcorn.Utils
         /// <summary>
         /// Default request timeout
         /// </summary>
-        public const int DefaultRequestTimeoutInSecond = 10;
+        public const int DefaultRequestTimeoutInSecond = 15;
     }
 }

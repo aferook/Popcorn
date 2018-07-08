@@ -90,26 +90,30 @@ namespace Popcorn.Windows
 
         private void OnKeyPressed(object sender, KeyPressedArgs e)
         {
-            if (e.KeyPressed == Key.Down || e.KeyPressed == Key.Up)
+            if (IsActive)
             {
-                var movieScrollviewer =
-                    this.FindChild<AnimatedScrollViewer>("MovieScrollViewer");
-                var showScrollviewer =
-                    this.FindChild<AnimatedScrollViewer>("ShowScrollViewer");
-                if (movieScrollviewer != null && movieScrollviewer.IsVisible)
-                    movieScrollviewer.Focus();
-
-                if (showScrollviewer != null && showScrollviewer.IsVisible)
-                    showScrollviewer.Focus();
-            }
-
-            if (e.KeyPressed == Key.V && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control &&
-                Clipboard.ContainsText())
-            {
-                var clipboard = Clipboard.GetText();
-                if (clipboard.StartsWith("magnet"))
+                Messenger.Default.Send(new KeyPressedMessage(e));
+                if (e.KeyPressed == Key.Down || e.KeyPressed == Key.Up)
                 {
-                    Messenger.Default.Send(new DownloadMagnetLinkMessage(clipboard));
+                    var movieScrollviewer =
+                        this.FindChild<AnimatedScrollViewer>("MovieScrollViewer");
+                    var showScrollviewer =
+                        this.FindChild<AnimatedScrollViewer>("ShowScrollViewer");
+                    if (movieScrollviewer != null && movieScrollviewer.IsVisible)
+                        movieScrollviewer.Focus();
+
+                    if (showScrollviewer != null && showScrollviewer.IsVisible)
+                        showScrollviewer.Focus();
+                }
+
+                if (e.KeyPressed == Key.V && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control &&
+                    Clipboard.ContainsText())
+                {
+                    var clipboard = Clipboard.GetText();
+                    if (clipboard.StartsWith("magnet"))
+                    {
+                        Messenger.Default.Send(new DownloadMagnetLinkMessage(clipboard));
+                    }
                 }
             }
         }
@@ -118,12 +122,7 @@ namespace Popcorn.Windows
         {
             var searchBox =
                 this.FindChild<TextBox>("SearchBox");
-            if (e.Key == Key.I && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control && !searchBox.IsFocused)
-            {
-                var vm = DataContext as WindowViewModel;
-                vm?.OpenAboutCommand.Execute(null);
-            }
-            else if (e.Key == Key.F3 || (Keyboard.Modifiers & ModifierKeys.Shift) == ModifierKeys.Shift &&
+            if (e.Key == Key.F3 || (Keyboard.Modifiers & ModifierKeys.Shift) == ModifierKeys.Shift &&
                      e.Key == Key.F)
             {
                 searchBox.Focus();

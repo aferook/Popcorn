@@ -4,11 +4,14 @@ using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using CookComputing.XmlRpc;
+using GalaSoft.MvvmLight.Messaging;
 using NLog;
 using Polly;
-using Popcorn.OSDB;
+using OSDB;
+using Popcorn.Helpers;
+using Popcorn.Messaging;
 using Popcorn.Utils;
+using Popcorn.Utils.Exceptions;
 using SubtitlesParser.Classes;
 
 namespace Popcorn.Services.Subtitles
@@ -18,6 +21,13 @@ namespace Popcorn.Services.Subtitles
     /// </summary>
     public class SubtitlesService : ISubtitlesService
     {
+        private readonly IOsdbClient _client;
+
+        public SubtitlesService()
+        {
+            _client = new OsdbClient();
+        }
+
         /// <summary>
         /// Logger of the class
         /// </summary>
@@ -27,11 +37,11 @@ namespace Popcorn.Services.Subtitles
         /// Get subtitles languages
         /// </summary>
         /// <returns>Languages</returns>
-        public async Task<IEnumerable<Language>> GetSubLanguages()
+        public async Task<IEnumerable<OSDB.Models.Language>> GetSubLanguages()
         {
             var retryGetSubLanguagesPolicy = Policy
-                .Handle<XmlRpcServerException>()
-                .WaitAndRetryAsync(5, retryAttempt =>
+                .Handle<Exception>()
+                .WaitAndRetryAsync(2, retryAttempt =>
                     TimeSpan.FromSeconds(Math.Pow(2, retryAttempt))
                 );
 
@@ -39,15 +49,14 @@ namespace Popcorn.Services.Subtitles
             {
                 return await retryGetSubLanguagesPolicy.ExecuteAsync(async () =>
                 {
-                    using (var osdb = await new Osdb().Login(Constants.OsdbUa))
-                    {
-                        return await osdb.GetSubLanguages();
-                    }
+                    var osdb = new OsdbClient();
+                    return await osdb.GetSubLanguages();
                 });
             }
             catch (Exception)
             {
-                return new List<Language>();
+                Messenger.Default.Send(new ManageExceptionMessage(new PopcornException(LocalizationProviderHelper.GetLocalizedValue<string>("OpenSubtitlesNotAvailable"))));
+                return new List<OSDB.Models.Language>();
             }
         }
 
@@ -59,21 +68,15 @@ namespace Popcorn.Services.Subtitles
         /// <param name="season">Season number</param>
         /// <param name="episode">Episode number</param>
         /// <returns>Subtitles</returns>
-        public async Task<IList<Subtitle>> SearchSubtitlesFromImdb(string languages, string imdbId, int? season, int? episode)
+        public async Task<IList<OSDB.Models.Subtitle>> SearchSubtitlesFromImdb(string languages, string imdbId, int? season, int? episode)
         {
             var retrySearchSubtitlesFromImdbPolicy = Policy
-                .Handle<XmlRpcServerException>()
-                .WaitAndRetryAsync(5, retryAttempt =>
+                .Handle<Exception>()
+                .WaitAndRetryAsync(2, retryAttempt =>
                     TimeSpan.FromSeconds(Math.Pow(2, retryAttempt))
                 );
 
-            return await retrySearchSubtitlesFromImdbPolicy.ExecuteAsync(async () =>
-            {
-                using (var osdb = await new Osdb().Login(Constants.OsdbUa))
-                {
-                    return await osdb.SearchSubtitlesFromImdb(languages, imdbId, season, episode);
-                }
-            });
+            return await retrySearchSubtitlesFromImdbPolicy.ExecuteAsync(async () => await _client.SearchSubtitlesFromImdb(languages, imdbId, season, episode));
         }
 
         /// <summary>
@@ -83,21 +86,15 @@ namespace Popcorn.Services.Subtitles
         /// <param name="subtitle">Subtitle to download</param>
         /// <param name="remote">Is remote download path</param>
         /// <returns>Downloaded subtitle path</returns>
-        public async Task<string> DownloadSubtitleToPath(string path, Subtitle subtitle, bool remote = true)
+        public async Task<string> DownloadSubtitleToPath(string path, OSDB.Models.Subtitle subtitle, bool remote = true)
         {
             var retryDownloadSubtitleToPathPolicy = Policy
-                .Handle<XmlRpcServerException>()
-                .WaitAndRetryAsync(5, retryAttempt =>
+                .Handle<Exception>()
+                .WaitAndRetryAsync(2, retryAttempt =>
                     TimeSpan.FromSeconds(Math.Pow(2, retryAttempt))
                 );
 
-            return await retryDownloadSubtitleToPathPolicy.ExecuteAsync(async () =>
-            {
-                using (var osdb = await new Osdb().Login(Constants.OsdbUa))
-                {
-                    return await osdb.DownloadSubtitleToPath(path, subtitle, remote);
-                }
-            });
+            return await retryDownloadSubtitleToPathPolicy.ExecuteAsync(async () => await _client.DownloadSubtitleToPath(path, subtitle, remote));
         }
 
         /// <summary>
@@ -105,13 +102,46 @@ namespace Popcorn.Services.Subtitles
         /// </summary>
         /// <param name="filePath"></param>
         /// <returns></returns>
-        public IEnumerable<SubtitleItem> LoadCaptions(string filePath)
+        public string LoadCaptions(string filePath)
         {
-            if (string.IsNullOrEmpty(filePath)) return new List<SubtitleItem>();
-            var parser = new SubtitlesParser.Classes.Parsers.SubParser();
-            using (var fileStream = File.OpenRead(filePath))
+            if (string.IsNullOrEmpty(filePath)) return string.Empty;
+            try
             {
-                return parser.ParseStream(fileStream, Encoding.UTF8);
+                var parser = new SubtitlesParser.Classes.Parsers.SubParser();
+                using (var fileStream = File.OpenRead(filePath))
+                {
+                    var lines = parser.ParseStream(fileStream, Encoding.UTF8);
+                    var file = $@"{Path.GetDirectoryName(filePath)}\{Guid.NewGuid()}.srt";
+                    using (var srtFile = new StreamWriter(file, false, Encoding.UTF8))
+                    {
+                        var count = 1;
+                        foreach (var line in lines)
+                        {
+                            if (line.StartTime <= 0 || line.EndTime <= 0)
+                            {
+                                continue;
+                            }
+
+                            srtFile.WriteLine(count);
+                            srtFile.WriteLine(
+                                $"{TimeSpan.FromMilliseconds(line.StartTime).ToString("hh\\:mm\\:ss\\,fff")} --> {TimeSpan.FromMilliseconds(line.EndTime).ToString("hh\\:mm\\:ss\\,fff")}");
+                            foreach (var item in line.Lines)
+                            {
+                                srtFile.WriteLine(item);
+                            }
+
+                            srtFile.WriteLine();
+                            count++;
+                        }
+                    }
+
+                    return file;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex);
+                return string.Empty;
             }
         }
 

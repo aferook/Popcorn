@@ -9,12 +9,10 @@ using System.Threading.Tasks;
 using Akavache;
 using GalaSoft.MvvmLight.Messaging;
 using NLog;
-using Popcorn.Helpers;
 using Popcorn.Messaging;
 using Popcorn.Models.Localization;
 using Popcorn.Models.Movie;
 using Popcorn.Models.Shows;
-using Popcorn.Models.Subtitles;
 using Popcorn.Models.User;
 using Popcorn.Services.Movies.Movie;
 using Popcorn.Utils;
@@ -85,9 +83,9 @@ namespace Popcorn.Services.User
                 if (user != null)
                     User = user;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-
+                Logger.Error(ex);
             }
 
             if (User.Language == null)
@@ -108,20 +106,6 @@ namespace Popcorn.Services.User
             if (User.CacheLocation == null)
             {
                 User.CacheLocation = Path.GetTempPath() + @"Popcorn";
-            }
-
-            if (User.DefaultSubtitleSize == null)
-            {
-                User.DefaultSubtitleSize = new SubtitleSize
-                {
-                    Size = 26,
-                    Label = LocalizationProviderHelper.GetLocalizedValue<string>("Normal")
-                };
-            }
-
-            if (string.IsNullOrEmpty(User.DefaultSubtitleColor))
-            {
-                User.DefaultSubtitleColor = "#FFFFFF";
             }
         }
 
@@ -369,28 +353,18 @@ namespace Popcorn.Services.User
         }
 
         /// <summary>
-        /// Set default subtitle color
+        /// Get the cache location path
         /// </summary>
-        /// <param name="color"></param>
-        public void SetDefaultSubtitleColor(string color)
-        {
-            User.DefaultSubtitleColor = color;
-        }
-
-        /// <summary>
-        /// Set default subtitle size
-        /// </summary>
-        /// <param name="size"></param>
-        public void SetDefaultSubtitleSize(SubtitleSize size)
-        {
-            User.DefaultSubtitleSize = size;
-        }
-
+        /// <returns>Cache location</returns>
         public string GetCacheLocationPath()
         {
             return User.CacheLocation;
         }
 
+        /// <summary>
+        /// Set the cache location path
+        /// </summary>
+        /// <param name="path">Cache location path</param>
         public void SetCacheLocationPath(string path)
         {
             User.CacheLocation = path;
@@ -462,11 +436,11 @@ namespace Popcorn.Services.User
         /// <param name="language">Language</param>
         public async Task SetCurrentLanguage(Language language)
         {
-            User.Language.Culture = language.Culture;
-            await MovieService.ChangeTmdbLanguage(language);
-            await ShowService.ChangeTmdbLanguage(language);
             try
             {
+                User.Language.Culture = language.Culture;
+                await MovieService.ChangeTmdbLanguage(language);
+                await ShowService.ChangeTmdbLanguage(language);
                 LocalizeDictionary.Instance.Culture = new CultureInfo(language.Culture);
             }
             catch (Exception ex)

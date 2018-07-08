@@ -14,11 +14,12 @@ using GalaSoft.MvvmLight.Ioc;
 using Popcorn.Models.Genres;
 using Popcorn.Models.User;
 using Popcorn.Utils.Exceptions;
-using Popcorn.ViewModels.Windows.Settings;
 using Polly;
 using Polly.Timeout;
 using Popcorn.Extensions;
 using Popcorn.Services.Tmdb;
+using Popcorn.ViewModels.Pages.Home.Settings;
+using Popcorn.ViewModels.Pages.Home.Settings.ApplicationSettings;
 using TMDbLib.Objects.Find;
 using TMDbLib.Objects.People;
 using Utf8Json;
@@ -56,6 +57,9 @@ namespace Popcorn.Services.Movies.Movie
                 _moviesToTranslateObservable.Drain(s => Observable.Return(s).Delay(TimeSpan.FromMilliseconds(250)))
                     .Subscribe(async movieToTranslate =>
                     {
+                        if (movieToTranslate == null)
+                            return;
+
                         var timeoutPolicy =
                             Policy.TimeoutAsync(Utils.Constants.DefaultRequestTimeoutInSecond,
                                 TimeoutStrategy.Pessimistic);
@@ -630,7 +634,7 @@ namespace Popcorn.Services.Movies.Movie
         /// <returns>Task</returns>
         public async Task TranslateMovie(IMovie movieToTranslate)
         {
-            if ((await _tmdbService.GetClient).DefaultLanguage == "en" &&
+            if (movieToTranslate.TranslationLanguage == null || (await _tmdbService.GetClient).DefaultLanguage == "en" &&
                 movieToTranslate.TranslationLanguage == (await _tmdbService.GetClient).DefaultLanguage) return;
             _moviesToTranslateObservable.OnNext(movieToTranslate);
         }

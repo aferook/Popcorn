@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Specialized;
 using System.Configuration;
-using System.IO;
 using System.Reflection;
 
 namespace Popcorn.Utils
@@ -14,7 +13,12 @@ namespace Popcorn.Utils
         /// <summary>
         /// App version
         /// </summary>
-        public const string AppVersion = "4.0.1";
+        public const string AppVersion = "5.0.1";
+
+        /// <summary>
+        /// Copyright
+        /// </summary>
+        public static readonly string Copyright = "Copyright Popcorn © 2015-" + DateTime.Now.Year;
 
         /// <summary>
         /// Endpoint to API
@@ -102,5 +106,15 @@ namespace Popcorn.Utils
         /// Default request timeout
         /// </summary>
         public const int DefaultRequestTimeoutInSecond = 15;
+
+        /// <summary>
+        /// Endpoint to OpenSubtitles XML Api
+        /// </summary>
+        public const string OpenSubtitlesXmlRpcEndpoint = "https://api.opensubtitles.org:443/xml-rpc";
+
+        /// <summary>
+        /// Endpoint to OpenSubtitles REST Api
+        /// </summary>
+        public const string OpenSubtitlesRestApiEndpoint = "https://rest.opensubtitles.org";
     }
 }
